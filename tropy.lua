@@ -16,7 +16,7 @@ width = 4
 
 tick_length = 1 / 24 -- ppqn
 
-d_bound = 1 / 2 -- half a beat
+d_bound = 1 / 2 -- notes will tend to stay 1/8th note apart
 
 friction = 0.0001
 inertia = 1000
@@ -46,7 +46,7 @@ function play_note(note)
 end
 
 function add_note(midi_note)
-	note = {
+	local note = {
 		x = playhead_x,
 		dx = 0,
 		midi_note = midi_note or 60,
@@ -55,6 +55,26 @@ function add_note(midi_note)
 	}
 	table.insert(notes, note)
 	play_note(note)
+end
+
+function double_width()
+	local n_notes = #notes
+	for i = 1, n_notes do
+		local note = notes[i]
+		notes[i + n_notes] = {
+			x = note.x + width,
+			dx = note.dx,
+			midi_note = note.midi_note,
+			l = 0,
+			anchor = note.anchor
+		}
+	end
+	width = width * 2
+end
+
+-- TODO
+function halve_width()
+	width = width / 2
 end
 
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
