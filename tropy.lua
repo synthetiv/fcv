@@ -93,6 +93,11 @@ function redraw()
 	
 	for i, note in ipairs(notes) do
 		screen.circle(note.x, 32, 1)
+		if note.x < 1 then
+			screen.circle(note.x + width, 32, 1)
+		elseif note.x > width then
+			screen.circle(note.x - width, 32, 1)
+		end
 		screen.level(6)
 		screen.fill()
 	end
