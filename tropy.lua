@@ -14,9 +14,6 @@ repulsion = 1 / 128
 
 width = 128
 
--- TODO: clip dx
-max_dx = 1
-
 function wrap_distance(a, b)
 	local d = b - a
 	if d > width / 2 then
@@ -40,6 +37,7 @@ function tick()
 				local d = wrap_distance(note.x, other.x)
 				local abs_d = math.abs(d)
 				note.dx = note.dx + sign(d) * (abs_d - repel_distance) / (repel_distance * abs_d * abs_d)
+				-- TODO: clip dx...?
 			end
 		end
 	end
