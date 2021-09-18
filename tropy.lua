@@ -10,6 +10,7 @@ play_clock = nil
 
 notes = {}
 erasing = false
+anchoring = false
 
 width = 128
 
@@ -49,24 +50,28 @@ function add_note(midi_note)
 		x = playhead_x,
 		dx = 0,
 		midi_note = midi_note or 60,
-		l = 0
+		l = 0,
+		anchor = anchoring
 	}
 	table.insert(notes, note)
 	play_note(note)
 end
 
--- TODO: create 'anchor' notes that don't move -- or 'heavy' notes that move less
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
 function tick()
 	-- move notes
 	for i, note in ipairs(notes) do
-		note.x = note.x + note.dx
-		if note.x < 1 then
-			note.x = note.x + width
-		elseif note.x > width then
-			note.x = note.x - width
+		if note.anchor then
+			note.dx = 0
+		else
+			note.x = note.x + note.dx
+			if note.x < 1 then
+				note.x = note.x + width
+			elseif note.x > width then
+				note.x = note.x - width
+			end
+			note.l = note.l * l_decay
 		end
-		note.l = note.l * l_decay
 	end
 	-- move playhead
 	local prev_playhead_x = playhead_x
@@ -76,27 +81,29 @@ function tick()
 	end
 	-- update motion
 	for i, note in ipairs(notes) do
-		local ddx = 0
-		for j, other in ipairs(notes) do
-			if note ~= other then
-				local d = wrap_distance(note.x, other.x)
-				-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
-				-- 'd_bound' is the distance at which there is NO attraction or repulsion
-				-- below d_bound, repulsion increases to infinity as d approaches 0
-				-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
-				-- max_repulsion keeps repulsion force from hitting infinity,
-				-- so that notes can float past one another instead of bouncing off
-				ddx = ddx + sign(d) * math.max(-max_repulsion, d_bound * (math.abs(d) - d_bound) / d / d)
+		if not note.anchor then
+			local ddx = 0
+			for j, other in ipairs(notes) do
+				if note ~= other then
+					local d = wrap_distance(note.x, other.x)
+					-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
+					-- 'd_bound' is the distance at which there is NO attraction or repulsion
+					-- below d_bound, repulsion increases to infinity as d approaches 0
+					-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
+					-- max_repulsion keeps repulsion force from hitting infinity,
+					-- so that notes can float past one another instead of bouncing off
+					ddx = ddx + sign(d) * math.max(-max_repulsion, d_bound * (math.abs(d) - d_bound) / d / d)
+				end
 			end
-		end
-		-- 'inertia' reduces the influence of attraction/repulsion forces
-		ddx = ddx / (1 + inertia)
-		-- 'friction' reduces speed over time, damping oscillation
-		-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
-		note.dx = ddx + note.dx / (1 + friction)
-		-- finally, clamp overall speed
-		if math.abs(note.dx) > dx_max then
-			note.dx = dx_max * sign(note.dx)
+			-- 'inertia' reduces the influence of attraction/repulsion forces
+			ddx = ddx / (1 + inertia)
+			-- 'friction' reduces speed over time, damping oscillation
+			-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
+			note.dx = ddx + note.dx / (1 + friction)
+			-- finally, clamp overall speed
+			if math.abs(note.dx) > dx_max then
+				note.dx = dx_max * sign(note.dx)
+			end
 		end
 	end
 	-- detect note-playhead collisions
@@ -161,11 +168,12 @@ function redraw()
 	for i, note in ipairs(notes) do
 		local x = note.x
 		local y = 64 - note.midi_note / 2
-		screen.circle(x, y, 1)
+		local r = note.anchor and 1.1 or 1
+		screen.circle(x, y, r)
 		if x < 1 then
-			screen.circle(x + width, y, 1)
+			screen.circle(x + width, y, r)
 		elseif note.x > width then
-			screen.circle(x - width, y, 1)
+			screen.circle(x - width, y, r)
 		end
 		screen.level(3 + math.floor(12 * note.l))
 		screen.fill()
@@ -175,7 +183,9 @@ function redraw()
 end
 
 function key(n, z)
-	if n == 2 then
+	if n == 1 then
+		anchoring = z == 1
+	elseif n == 2 then
 		erasing = z == 1
 	elseif n == 3 then
 		if z == 1 then
