@@ -1,5 +1,8 @@
 -- tremple ov psychick youth
 
+engine.name = 'Thebangs'
+thebangs = include 'thebangs/lib/thebangs_engine'
+
 playhead_x = 1
 play_clock = nil
 
@@ -32,6 +35,11 @@ end
 function sign(n)
 	if n >= 0 then return 1 end
 	return -1
+end
+
+function play_note(note)
+	engine.hz(note.hz)
+	note.l = 1
 end
 
 -- TODO: create 'anchor' notes that don't move -- or 'heavy' notes that move less
@@ -97,8 +105,7 @@ function tick()
 			else
 				clock.run(function()
 					clock.sleep(t_collision * tick_length * clock.get_beat_sec())
-					print 'ping'
-					note.l = 1
+					play_note(note)
 				end)
 			end
 		end
@@ -106,6 +113,11 @@ function tick()
 end
 
 function init()
+
+	thebangs.add_additional_synth_params()
+	params:add_separator()
+	thebangs.add_voicer_params()
+
 	play_clock = clock.run(function()
 		while true do
 			clock.sync(tick_length)
@@ -144,11 +156,14 @@ function key(n, z)
 		erasing = z == 1
 	elseif n == 3 then
 		if z == 1 then
-			table.insert(notes, {
+			note = {
 				x = playhead_x,
 				dx = 0,
-				l = 1
-			})
+				hz = 220,
+				l = 0
+			}
+			table.insert(notes, note)
+			play_note(note)
 		end
 	end
 end
