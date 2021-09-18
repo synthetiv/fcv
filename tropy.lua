@@ -6,13 +6,11 @@ play_clock = nil
 notes = {}
 erasing = false
 
-attract_distance = 32
-attraction = 1 / 128
-
 repel_distance = 16
-repulsion = 1 / 128
 
 width = 128
+
+l_decay = 0.9
 
 function wrap_distance(a, b)
 	local d = b - a
@@ -49,6 +47,7 @@ function tick()
 		elseif note.x > width then
 			note.x = note.x - width
 		end
+		note.l = note.l * l_decay
 	end
 	-- move playhead
 	local prev_playhead_x = playhead_x
@@ -64,6 +63,7 @@ function tick()
 				table.remove(notes, i)
 			else
 				print 'ping'
+				note.l = 1
 			end
 		end
 	end
@@ -96,7 +96,7 @@ function redraw()
 		elseif note.x > width then
 			screen.circle(note.x - width, 32, 1)
 		end
-		screen.level(6)
+		screen.level(3 + math.floor(12 * note.l))
 		screen.fill()
 	end
 
@@ -110,7 +110,8 @@ function key(n, z)
 		if z == 1 then
 			table.insert(notes, {
 				x = playhead_x,
-				dx = 0
+				dx = 0,
+				l = 1
 			})
 		end
 	end
