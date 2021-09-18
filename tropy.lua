@@ -111,10 +111,10 @@ function redraw()
 	screen.clear()
 	screen.aa(1)
 
-	screen.move(playhead_x, 1)
+	screen.move(playhead_x + 0.5, 1)
 	screen.line_rel(0, 63)
 	screen.line_width(1)
-	screen.level(4)
+	screen.level(1)
 	screen.stroke()
 	
 	for i, note in ipairs(notes) do
