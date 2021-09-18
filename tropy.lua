@@ -8,6 +8,8 @@ erasing = false
 
 width = 128
 
+tick_length = 4 / width
+
 d_bound = 16
 
 friction = 0.001
@@ -34,26 +36,6 @@ end
 -- TODO: create 'anchor' notes that don't move -- or 'heavy' notes that move less
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
 function tick()
-	-- update motion
-	for i, note in ipairs(notes) do
-		for j, other in ipairs(notes) do
-			if note ~= other then
-				local d = wrap_distance(note.x, other.x)
-				-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
-				-- 'd_bound' is the distance at which there is NO attraction or repulsion
-				-- below d_bound, repulsion increases to infinity as d approaches 0
-				-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
-				-- 'inertia' reduces the influence of attraction/repulsion forces
-				local ddx = sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
-				-- clip change in dx -- this prevents sudden bounces, allows notes to float past one another instead
-				if math.abs(ddx) > ddx_max then
-					ddx = ddx_max * sign(ddx)
-				end
-				-- friction reduces speed both overall and over time
-				note.dx = (note.dx + ddx) / (1 + friction)
-			end
-		end
-	end
 	-- move notes
 	for i, note in ipairs(notes) do
 		note.x = note.x + note.dx
@@ -70,15 +52,46 @@ function tick()
 	if playhead_x > width then
 		playhead_x = playhead_x - width
 	end
-	-- play notes
+	-- update motion
 	for i, note in ipairs(notes) do
-		-- TODO: is this the best way to detect collisions?
-		if note.x - note.dx > prev_playhead_x and note.x <= playhead_x then
+		for j, other in ipairs(notes) do
+			if note ~= other then
+				local d = wrap_distance(note.x, other.x)
+				-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
+				-- 'd_bound' is the distance at which there is NO attraction or repulsion
+				-- below d_bound, repulsion increases to infinity as d approaches 0
+				-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
+				-- 'inertia' reduces the influence of attraction/repulsion forces
+				local ddx = sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
+				-- 'ddx_max' clips change in dx, preventing sudden bounces, allowing notes to float past one another instead
+				if math.abs(ddx) > ddx_max then
+					ddx = ddx_max * sign(ddx)
+				end
+				-- 'friction' reduces speed over time, damping oscillation
+				note.dx = ddx + note.dx / (1 + friction)
+			end
+		end
+	end
+	-- detect note-playhead collisions
+	for i, note in ipairs(notes) do
+		-- TODO:
+		-- find intersection of two lines...
+		-- playhead line: x = playhead_x + t
+		-- note line: x = note.x + note.dx * t
+		-- playhead_x + t = note.x + note.dx * t
+		-- t - note.dx * t = note.x - playhead_x
+		-- t * (1 - note.dx) = note.x - playhead_x
+		-- t = (note.x - playhead_x) / (1 - note.dx)
+		local t_collision = (note.x - playhead_x) / (1 - note.dx)
+		if t_collision > 0 and t_collision <= 1 then
 			if erasing then
 				table.remove(notes, i)
 			else
-				print 'ping'
-				note.l = 1
+				clock.run(function()
+					clock.sleep(t_collision * tick_length * clock.get_beat_sec())
+					print 'ping'
+					note.l = 1
+				end)
 			end
 		end
 	end
@@ -87,7 +100,7 @@ end
 function init()
 	play_clock = clock.run(function()
 		while true do
-			clock.sync(4/width)
+			clock.sync(tick_length)
 			tick()
 			redraw()
 		end
