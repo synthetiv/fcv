@@ -3,6 +3,8 @@
 engine.name = 'Thebangs'
 thebangs = include 'thebangs/lib/thebangs_engine'
 
+musicutil = require 'musicutil'
+
 playhead_x = 1
 play_clock = nil
 
@@ -15,9 +17,9 @@ tick_length = 4 / width
 
 d_bound = 16
 
-friction = 0.01
-inertia = 10
-ddx_max = 0.01
+friction = 0.0001
+inertia = 100
+ddx_max = 0.001
 dx_max = width / 2
 
 l_decay = 0.9
@@ -38,8 +40,19 @@ function sign(n)
 end
 
 function play_note(note)
-	engine.hz(note.hz)
+	engine.hz(musicutil.note_num_to_freq(note.midi_note))
 	note.l = 1
+end
+
+function add_note(midi_note)
+	note = {
+		x = playhead_x,
+		dx = 0,
+		midi_note = midi_note or 60,
+		l = 0
+	}
+	table.insert(notes, note)
+	play_note(note)
 end
 
 -- TODO: create 'anchor' notes that don't move -- or 'heavy' notes that move less
@@ -112,7 +125,17 @@ function tick()
 	end
 end
 
+function midi_event(data)
+	local message = midi.to_msg(data)
+	if message.type == 'note_on' then
+		add_note(message.note)
+	end
+end
+
 function init()
+	
+	m = midi.connect(1).device
+	m.event = midi_event
 
 	thebangs.add_additional_synth_params()
 	params:add_separator()
@@ -138,11 +161,13 @@ function redraw()
 	screen.stroke()
 	
 	for i, note in ipairs(notes) do
-		screen.circle(note.x, 32, 1)
-		if note.x < 1 then
-			screen.circle(note.x + width, 32, 1)
+		local x = note.x
+		local y = 64 - note.midi_note / 2
+		screen.circle(x, y, 1)
+		if x < 1 then
+			screen.circle(x + width, y, 1)
 		elseif note.x > width then
-			screen.circle(note.x - width, 32, 1)
+			screen.circle(x - width, y, 1)
 		end
 		screen.level(3 + math.floor(12 * note.l))
 		screen.fill()
@@ -156,14 +181,7 @@ function key(n, z)
 		erasing = z == 1
 	elseif n == 3 then
 		if z == 1 then
-			note = {
-				x = playhead_x,
-				dx = 0,
-				hz = 220,
-				l = 0
-			}
-			table.insert(notes, note)
-			play_note(note)
+			add_note()
 		end
 	end
 end
