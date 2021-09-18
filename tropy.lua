@@ -70,8 +70,8 @@ function tick()
 			elseif note.x > width then
 				note.x = note.x - width
 			end
-			note.l = note.l * l_decay
 		end
+		note.l = note.l * l_decay
 	end
 	-- move playhead
 	local prev_playhead_x = playhead_x
@@ -168,12 +168,21 @@ function redraw()
 	for i, note in ipairs(notes) do
 		local x = note.x
 		local y = 64 - note.midi_note / 2
-		local r = note.anchor and 1.1 or 1
+		local r = note.anchor and 1.4 or 1
 		screen.circle(x, y, r)
+		if note.anchor then
+			screen.circle(x, 64, 1)
+		end
 		if x < 1 then
 			screen.circle(x + width, y, r)
+			if note.anchor then
+				screen.circle(x + width, 64, 1)
+			end
 		elseif note.x > width then
 			screen.circle(x - width, y, r)
+			if note.anchor then
+				screen.circle(x - width, 64, 1)
+			end
 		end
 		screen.level(3 + math.floor(12 * note.l))
 		screen.fill()
