@@ -12,8 +12,6 @@ attraction = 1 / 128
 repel_distance = 16
 repulsion = 1 / 128
 
-friction = 1 / 2
-
 width = 128
 
 -- TODO: clip dx
@@ -39,18 +37,9 @@ function tick()
 	for i, note in ipairs(notes) do
 		for j, other in ipairs(notes) do
 			if note ~= other then
-				note.dx = note.dx * friction
 				local d = wrap_distance(note.x, other.x)
 				local abs_d = math.abs(d)
-				-- TODO: what about a kind of logarithmic curve from 0 to 'repel_distance', then a parabola after that...?
-				if abs_d <= attract_distance then
-					-- one-pole smoother toward the other note
-					note.dx = note.dx + d * attraction
-				end
-				if abs_d <= repel_distance then
-					-- more repulsion the closer we are
-					note.dx = note.dx - (repel_distance / d) * repulsion
-				end
+				note.dx = note.dx + sign(d) * (abs_d - repel_distance) / (repel_distance * abs_d * abs_d)
 			end
 		end
 	end
@@ -94,6 +83,7 @@ end
 
 function redraw()
 	screen.clear()
+	screen.aa(1)
 
 	screen.move(playhead_x, 1)
 	screen.line_rel(0, 63)
