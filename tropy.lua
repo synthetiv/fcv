@@ -64,10 +64,14 @@ function tick()
 				-- 'inertia' reduces the influence of attraction/repulsion forces
 				local ddx = sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
 				-- 'ddx_max' clips change in dx, preventing sudden bounces, allowing notes to float past one another instead
+				-- TODO: it also kinda inhibits all motion within clusters of notes when friction is nonzero.
+				-- does pre-scaling ddx (before clipping) help?
+				ddx = ddx / (1 + friction)
 				if math.abs(ddx) > ddx_max then
 					ddx = ddx_max * sign(ddx)
 				end
 				-- 'friction' reduces speed over time, damping oscillation
+				-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
 				note.dx = ddx + note.dx / (1 + friction)
 			end
 		end
