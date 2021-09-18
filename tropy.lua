@@ -27,15 +27,16 @@ function sign(n)
 	return -1
 end
 
+-- TODO: create 'anchor' notes that don't move -- or 'heavy' notes that move less
+-- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
 function tick()
 	-- update motion
 	for i, note in ipairs(notes) do
 		for j, other in ipairs(notes) do
 			if note ~= other then
 				local d = wrap_distance(note.x, other.x)
-				local abs_d = math.abs(d)
-				note.dx = note.dx + sign(d) * (abs_d - repel_distance) / (repel_distance * abs_d * abs_d)
-				-- TODO: clip dx...?
+				note.dx = note.dx + sign(d) * (math.abs(d) - repel_distance) / (repel_distance * d * d) / 4
+				-- TODO: clip dx, and/or clip ddx?
 			end
 		end
 	end
