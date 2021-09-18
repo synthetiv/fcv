@@ -6,9 +6,13 @@ play_clock = nil
 notes = {}
 erasing = false
 
-repel_distance = 16
-
 width = 128
+
+d_bound = 16
+
+friction = 0.001
+inertia = 3
+ddx_max = 0.001
 
 l_decay = 0.9
 
@@ -35,8 +39,18 @@ function tick()
 		for j, other in ipairs(notes) do
 			if note ~= other then
 				local d = wrap_distance(note.x, other.x)
-				note.dx = note.dx + sign(d) * (math.abs(d) - repel_distance) / (repel_distance * d * d) / 4
-				-- TODO: clip dx, and/or clip ddx?
+				-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
+				-- 'd_bound' is the distance at which there is NO attraction or repulsion
+				-- below d_bound, repulsion increases to infinity as d approaches 0
+				-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
+				-- 'inertia' reduces the influence of attraction/repulsion forces
+				local ddx = sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
+				-- clip change in dx -- this prevents sudden bounces, allows notes to float past one another instead
+				if math.abs(ddx) > ddx_max then
+					ddx = ddx_max * sign(ddx)
+				end
+				-- friction reduces speed both overall and over time
+				note.dx = (note.dx + ddx) / (1 + friction)
 			end
 		end
 	end
