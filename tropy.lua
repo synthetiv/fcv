@@ -12,9 +12,10 @@ tick_length = 4 / width
 
 d_bound = 16
 
-friction = 0.001
-inertia = 3
-ddx_max = 0.001
+friction = 0.01
+inertia = 10
+ddx_max = 0.01
+dx_max = width / 2
 
 l_decay = 0.9
 
@@ -54,6 +55,7 @@ function tick()
 	end
 	-- update motion
 	for i, note in ipairs(notes) do
+		local ddx = 0
 		for j, other in ipairs(notes) do
 			if note ~= other then
 				local d = wrap_distance(note.x, other.x)
@@ -62,21 +64,23 @@ function tick()
 				-- below d_bound, repulsion increases to infinity as d approaches 0
 				-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
 				-- 'inertia' reduces the influence of attraction/repulsion forces
-				local ddx = sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
-				-- 'ddx_max' clips change in dx, preventing sudden bounces, allowing notes to float past one another instead
-				-- TODO: it also kinda inhibits all motion within clusters of notes when friction is nonzero.
-				-- does pre-scaling ddx (before clipping) help?
-				ddx = ddx / (1 + friction)
-				if math.abs(ddx) > ddx_max then
-					ddx = ddx_max * sign(ddx)
-				end
-				-- 'friction' reduces speed over time, damping oscillation
-				-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
-				note.dx = ddx + note.dx / (1 + friction)
+				ddx = ddx + sign(d) * d_bound * (math.abs(d) - d_bound) / d / d / (1 + inertia)
 			end
+		end
+		-- 'ddx_max' clips change in dx, preventing sudden bounces, allowing notes to float past one another instead
+		if math.abs(ddx) > ddx_max then
+			ddx = ddx_max * sign(ddx)
+		end
+		-- 'friction' reduces speed over time, damping oscillation
+		-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
+		note.dx = ddx + note.dx / (1 + friction)
+		-- finally, clamp overall speed
+		if math.abs(note.dx) > dx_max then
+			note.dx = dx_max * sign(note.dx)
 		end
 	end
 	-- detect note-playhead collisions
+	-- TODO: handle collisions at screen boundaries too, argh
 	for i, note in ipairs(notes) do
 		-- TODO:
 		-- find intersection of two lines...
