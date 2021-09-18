@@ -41,12 +41,13 @@ function tick()
 			if note ~= other then
 				note.dx = note.dx * friction
 				local d = wrap_distance(note.x, other.x)
+				local abs_d = math.abs(d)
 				-- TODO: what about a kind of logarithmic curve from 0 to 'repel_distance', then a parabola after that...?
-				if d <= attract_distance then
+				if abs_d <= attract_distance then
 					-- one-pole smoother toward the other note
 					note.dx = note.dx + d * attraction
 				end
-				if d <= repel_distance then
+				if abs_d <= repel_distance then
 					-- more repulsion the closer we are
 					note.dx = note.dx - (repel_distance / d) * repulsion
 				end
