@@ -101,9 +101,7 @@ function tick()
 		end
 	end
 	-- detect note-playhead collisions
-	-- TODO: handle collisions at screen boundaries too, argh
 	for i, note in ipairs(notes) do
-		-- TODO:
 		-- find intersection of two lines...
 		-- playhead line: x = playhead_x + t
 		-- note line: x = note.x + note.dx * t
@@ -111,7 +109,7 @@ function tick()
 		-- t - note.dx * t = note.x - playhead_x
 		-- t * (1 - note.dx) = note.x - playhead_x
 		-- t = (note.x - playhead_x) / (1 - note.dx)
-		local t_collision = (note.x - playhead_x) / (1 - note.dx)
+		local t_collision = wrap_distance(playhead_x, note.x) / (1 - note.dx)
 		if t_collision > 0 and t_collision <= 1 then
 			if erasing then
 				table.remove(notes, i)
