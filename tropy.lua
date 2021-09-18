@@ -5,22 +5,22 @@ thebangs = include 'thebangs/lib/thebangs_engine'
 
 musicutil = require 'musicutil'
 
-playhead_x = 1
+playhead_x = 0 -- TODO: hmmmm
 play_clock = nil
 
 notes = {}
 erasing = false
 anchoring = false
 
-width = 128
+width = 4
 
-tick_length = 4 / width
+tick_length = 1 / 24 -- ppqn
 
-d_bound = 16
+d_bound = 1 / 2 -- half a beat
 
 friction = 0.0001
 inertia = 1000
-max_repulsion = 20
+max_repulsion = 0.05
 dx_max = width / 2
 
 l_decay = 0.9
@@ -74,8 +74,7 @@ function tick()
 		note.l = note.l * l_decay
 	end
 	-- move playhead
-	local prev_playhead_x = playhead_x
-	playhead_x = playhead_x + 1
+	playhead_x = playhead_x + tick_length
 	if playhead_x > width then
 		playhead_x = playhead_x - width
 	end
@@ -109,13 +108,13 @@ function tick()
 	-- detect note-playhead collisions
 	for i, note in ipairs(notes) do
 		-- find intersection of two lines...
-		-- playhead line: x = playhead_x + t
+		-- playhead line: x = playhead_x + tick_length * t
 		-- note line: x = note.x + note.dx * t
-		-- playhead_x + t = note.x + note.dx * t
-		-- t - note.dx * t = note.x - playhead_x
-		-- t * (1 - note.dx) = note.x - playhead_x
-		-- t = (note.x - playhead_x) / (1 - note.dx)
-		local t_collision = wrap_distance(playhead_x, note.x) / (1 - note.dx)
+		-- playhead_x + tick_length * t = note.x + note.dx * t
+		-- tick_length * t - note.dx * t = note.x - playhead_x
+		-- t * (tick_length - note.dx) = note.x - playhead_x
+		-- t = (note.x - playhead_x) / (tick_length - note.dx)
+		local t_collision = wrap_distance(playhead_x, note.x) / (tick_length - note.dx)
 		if t_collision > 0 and t_collision <= 1 then
 			if erasing then
 				-- TODO: sometimes notes don't get deleted when there are lots in one place, and I think maybe that's because removing them here throws off ipairs...?
@@ -156,32 +155,36 @@ function init()
 end
 
 function redraw()
-	screen.clear()
-	screen.aa(1)
+	local scale = 128 / width
 
-	screen.move(playhead_x + 0.5, 1)
+	screen.clear()
+	screen.aa(0)
+
+	screen.move(playhead_x * scale + 0.5, 1)
 	screen.line_rel(0, 63)
 	screen.line_width(1)
 	screen.level(1)
 	screen.stroke()
 	
+	screen.aa(1)
+	
 	for i, note in ipairs(notes) do
-		local x = note.x
+		local x = note.x * scale
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		screen.circle(x, y, r)
 		if note.anchor then
 			screen.circle(x, 64, 1)
 		end
-		if x < 1 then
-			screen.circle(x + width, y, r)
+		if x <= 0 then
+			screen.circle(x + 128, y, r)
 			if note.anchor then
-				screen.circle(x + width, 64, 1)
+				screen.circle(x + 128, 64, 1)
 			end
-		elseif note.x > width then
-			screen.circle(x - width, y, r)
+		elseif x > 128 then
+			screen.circle(x - 128, y, r)
 			if note.anchor then
-				screen.circle(x - width, 64, 1)
+				screen.circle(x - 128, 64, 1)
 			end
 		end
 		screen.level(3 + math.floor(12 * note.l))
