@@ -122,6 +122,12 @@ function tick()
 			for j, other in ipairs(notes) do
 				if note ~= other then
 					local d = wrap_distance(note.x, other.x)
+					-- if these notes are in exactly the same place (which can happen when playing chords or
+					-- mashing keys), treat them as though they're slightly apart, with the first-added one
+					-- to the left of the second
+					if d == 0 then
+						d = 0.01 * (i > j and -1 or 1)
+					end
 					-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
 					-- 'd_bound' is the distance at which there is NO attraction or repulsion
 					-- below d_bound, repulsion increases to infinity as d approaches 0
