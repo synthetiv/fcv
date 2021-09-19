@@ -42,6 +42,7 @@ function sign(n)
 end
 
 function play_note(note)
+	-- TODO: use arbitrary callbacks as well or instead
 	engine.hz(musicutil.note_num_to_freq(note.midi_note))
 	note.l = 1
 end
@@ -135,6 +136,10 @@ function tick()
 					-- max_repulsion keeps repulsion force from hitting infinity,
 					-- so that notes can float past one another instead of bouncing off
 					ddx = ddx + sign(d) * math.max(-max_repulsion, d_bound * (math.abs(d) - d_bound) / d / d)
+					-- TODO: handle note lengths too... a few options:
+					-- 1. ignore
+					-- 2. increase d_bound from centers of notes <-- this seems like the most interesting option
+					-- 3. get distances between starts + ends of notes and choose the smallest
 				end
 			end
 			-- 'inertia' reduces the influence of attraction/repulsion forces
@@ -174,9 +179,11 @@ function tick()
 	end
 end
 
+-- TODO: grid control too :)
 function midi_event(data)
 	local message = midi.to_msg(data)
 	if message.type == 'note_on' then
+		-- TODO: store note lengths
 		add_note(message.note)
 	end
 end
@@ -228,6 +235,7 @@ function redraw()
 	-- draw notes
 	screen.aa(1)
 	for i, note in ipairs(notes) do
+		-- TODO: draw to indicate lengths
 		local x = note.x * scale + 0.5
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
@@ -254,6 +262,7 @@ function redraw()
 end
 
 function key(n, z)
+	-- TODO: key combos for halve/double?
 	if n == 1 then
 		anchoring = z == 1
 	elseif n == 2 then
