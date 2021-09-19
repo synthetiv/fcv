@@ -27,7 +27,7 @@ l_decay = 0.9
 
 function wrap_distance(a, b)
 	local d = b - a
-	if d > width / 2 then
+	if d >= width / 2 then
 		d = d - width
 	elseif d < -width / 2 then
 		d = d + width
@@ -57,6 +57,7 @@ function add_note(midi_note)
 	play_note(note)
 end
 
+-- TODO: something seems to go weird after enough double/halve_width()s -- all notes cluster together strangely...
 function double_width()
 	local n_notes = #notes
 	for i = 1, n_notes do
@@ -72,9 +73,20 @@ function double_width()
 	width = width * 2
 end
 
--- TODO
 function halve_width()
+	local half_width = width / 2
+	local new_notes = {}
+	for i, note in ipairs(notes) do
+		local d = wrap_distance(note.x, playhead_x)
+		if d > 0 and d <= half_width then
+			if note.x >= half_width then
+				note.x = note.x - half_width
+			end
+			table.insert(new_notes, note)
+		end
+	end
 	width = width / 2
+	notes = new_notes
 end
 
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
@@ -85,9 +97,9 @@ function tick()
 			note.dx = 0
 		else
 			note.x = note.x + note.dx
-			if note.x < 1 then
+			if note.x < 0 then
 				note.x = note.x + width
-			elseif note.x > width then
+			elseif note.x >= width then
 				note.x = note.x - width
 			end
 		end
@@ -95,7 +107,7 @@ function tick()
 	end
 	-- move playhead
 	playhead_x = playhead_x + tick_length
-	if playhead_x > width then
+	if playhead_x >= width then
 		playhead_x = playhead_x - width
 	end
 	-- update motion
