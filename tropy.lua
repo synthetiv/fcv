@@ -143,10 +143,11 @@ function tick()
 				end
 			end
 			-- 'inertia' reduces the influence of attraction/repulsion forces
-			ddx = ddx / (1 + inertia)
+			ddx = ddx / inertia
 			-- 'friction' reduces speed over time, damping oscillation
-			-- when friction is high, notes will tend to cluster together, with tighter spacing in the center of the cluster
-			note.dx = ddx + note.dx / (1 + friction)
+			-- when friction is 1, notes will find a comfortable spot and stay there, tending to cluster
+			-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
+			note.dx = ddx + note.dx * (1 - friction)
 			-- finally, clamp overall speed
 			if math.abs(note.dx) > dx_max then
 				note.dx = dx_max * sign(note.dx)
