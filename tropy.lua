@@ -43,15 +43,18 @@ end
 
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
-	engine.hz(musicutil.note_num_to_freq(note.midi_note))
+	engine.amp(note.mass / 40)
+	engine.hz(note.hz)
 	note.l = 1
 end
 
-function add_note(midi_note)
+function add_note(y, hz, mass)
 	local note = {
 		x = playhead_x,
+		y = y or 32,
 		dx = 0,
-		midi_note = midi_note or 60,
+		hz = hz or 440,
+		mass = mass or 1,
 		l = 0,
 		anchor = anchoring
 	}
@@ -66,7 +69,8 @@ function double_width()
 		notes[i + n_notes] = {
 			x = note.x + width,
 			dx = note.dx,
-			midi_note = note.midi_note,
+			hz = note.hz,
+			mass = note.mass,
 			l = 0,
 			anchor = note.anchor
 		}
@@ -144,7 +148,7 @@ function tick()
 				end
 			end
 			-- 'inertia' reduces the influence of attraction/repulsion forces
-			ddx = ddx / inertia
+			ddx = ddx / (note.mass * inertia)
 			-- 'friction' reduces speed over time, damping oscillation
 			-- when friction is 1, notes will find a comfortable spot and stay there, tending to cluster
 			-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
@@ -186,7 +190,9 @@ function midi_event(data)
 	local message = midi.to_msg(data)
 	if message.type == 'note_on' then
 		-- TODO: store note lengths
-		add_note(message.note)
+		local hz = musicutil.note_num_to_freq(message.note)
+		local mass = (40 + message.vel) / 100
+		add_note(64 - message.note / 2, hz, mass)
 	end
 end
 
@@ -239,7 +245,7 @@ function redraw()
 	for i, note in ipairs(notes) do
 		-- TODO: draw to indicate lengths
 		local x = note.x * scale + 0.5
-		local y = 64 - note.midi_note / 2
+		local y = note.y
 		local r = note.anchor and 1.4 or 1
 		screen.circle(x, y, r)
 		if note.anchor then
