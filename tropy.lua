@@ -198,21 +198,29 @@ function init()
 end
 
 function redraw()
-	local scale = 128 / width
+	local scale = 127 / width
 
 	screen.clear()
 	screen.aa(0)
 
-	screen.move(playhead_x * scale + 0.5, 1)
-	screen.line_rel(0, 63)
+	-- draw beats
+	screen.level(1)
+	for i = 0, width do
+		screen.rect(i * scale, 0, 1, 1)
+		screen.fill()
+	end
+
+	-- draw playhead
+	screen.move(playhead_x * scale + 0.5, 0)
+	screen.line_rel(0, 64)
 	screen.line_width(1)
 	screen.level(1)
 	screen.stroke()
 	
+	-- draw notes
 	screen.aa(1)
-	
 	for i, note in ipairs(notes) do
-		local x = note.x * scale
+		local x = note.x * scale + 0.5
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		screen.circle(x, y, r)
@@ -220,14 +228,14 @@ function redraw()
 			screen.circle(x, 64, 1)
 		end
 		if x <= 0 then
-			screen.circle(x + 128, y, r)
+			screen.circle(x + 127, y, r)
 			if note.anchor then
-				screen.circle(x + 128, 64, 1)
+				screen.circle(x + 127, 64, 1)
 			end
-		elseif x > 128 then
-			screen.circle(x - 128, y, r)
+		elseif x > 127 then
+			screen.circle(x - 127, y, r)
 			if note.anchor then
-				screen.circle(x - 128, 64, 1)
+				screen.circle(x - 127, 64, 1)
 			end
 		end
 		screen.level(3 + math.floor(12 * note.l))
