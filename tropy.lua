@@ -123,6 +123,7 @@ function tick()
 			for j, other in ipairs(notes) do
 				if note ~= other then
 					local d = wrap_distance(note.x, other.x)
+					-- TODO: set a max absolute distance beyond which notes don't influence one another -- allowing for separate groups/flocks
 					-- if these notes are in exactly the same place (which can happen when playing chords or
 					-- mashing keys), treat them as though they're slightly apart, with the first-added one
 					-- to the left of the second
