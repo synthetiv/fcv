@@ -18,9 +18,9 @@ tick_length = 1 / 24 -- ppqn
 
 d_bound = 1 / 2 -- notes will tend to stay 1/8th note apart
 
-friction = 0.0001
+friction = 0.001
 inertia = 1000
-max_repulsion = 0.05
+max_repulsion = 1
 dx_max = width / 2
 
 l_decay = 0.9
@@ -57,7 +57,6 @@ function add_note(midi_note)
 	play_note(note)
 end
 
--- TODO: something seems to go weird after enough double/halve_width()s -- all notes cluster together strangely...
 function double_width()
 	local n_notes = #notes
 	for i = 1, n_notes do
@@ -75,6 +74,7 @@ end
 
 function halve_width()
 	local half_width = width / 2
+	-- build a new table of notes containing only those we've just heard
 	local new_notes = {}
 	for i, note in ipairs(notes) do
 		local d = wrap_distance(note.x, playhead_x)
@@ -84,6 +84,10 @@ function halve_width()
 			end
 			table.insert(new_notes, note)
 		end
+	end
+	-- wrap play head position if needed
+	if playhead_x >= half_width then
+		playhead_x = playhead_x - half_width
 	end
 	width = width / 2
 	notes = new_notes
