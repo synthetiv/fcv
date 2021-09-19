@@ -7,6 +7,7 @@ musicutil = require 'musicutil'
 
 playhead_x = 0 -- TODO: hmmmm
 play_clock = nil
+draw_clock = nil
 
 notes = {}
 erasing = false
@@ -185,6 +186,12 @@ function init()
 		while true do
 			clock.sync(tick_length)
 			tick()
+		end
+	end)
+	
+	draw_clock = clock.run(function()
+		while true do
+			clock.sleep(1/15)
 			redraw()
 		end
 	end)
