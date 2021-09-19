@@ -149,7 +149,10 @@ function tick()
 		end
 	end
 	-- detect note-playhead collisions
-	for i, note in ipairs(notes) do
+	-- count down instead of up because we may end up removing elements from 'notes', which will
+	-- affect elements at indices > i
+	for i = #notes, 1, -1 do
+		local note = notes[i]
 		-- find intersection of two lines...
 		-- playhead line: x = playhead_x + tick_length * t
 		-- note line: x = note.x + note.dx * t
@@ -160,7 +163,6 @@ function tick()
 		local t_collision = wrap_distance(playhead_x, note.x) / (tick_length - note.dx)
 		if t_collision > 0 and t_collision <= 1 then
 			if erasing then
-				-- TODO: sometimes notes don't get deleted when there are lots in one place, and I think maybe that's because removing them here throws off ipairs...?
 				table.remove(notes, i)
 			else
 				clock.run(function()
