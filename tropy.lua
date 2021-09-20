@@ -22,18 +22,21 @@ tick_length = 1 / 24 -- ppqn
 
 d_bound = 1 / 2 -- notes will tend to stay 1/8th note apart
 
-friction = 0.001
+friction = 0.005
 inertia = 1000
-max_repulsion = 1
+max_repulsion = 10
 dx_max = width / 2
 
 l_decay = 0.9
 
 function wrap_distance(a, b)
 	local d = b - a
-	if d >= width / 2 then
+	-- TODO: things get rather out of hand sometimes (notes speeding out of control), and it's not
+	-- always clear why/when. wrapping using while instead of if may have helped, but not 100%.
+	while d >= width / 2 do
 		d = d - width
-	elseif d < -width / 2 then
+	end
+	while d < -width / 2 do
 		d = d + width
 	end
 	return d
@@ -110,9 +113,10 @@ function tick()
 			note.dx = 0
 		else
 			note.x = note.x + note.dx
-			if note.x < 0 then
+			while note.x < 0 do
 				note.x = note.x + width
-			elseif note.x >= width then
+			end
+			while note.x >= width do
 				note.x = note.x - width
 			end
 		end
