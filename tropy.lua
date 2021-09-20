@@ -9,6 +9,9 @@ playhead_x = 0 -- TODO: hmmmm
 play_clock = nil
 draw_clock = nil
 
+m = nil
+g = nil
+
 notes = {}
 erasing = false
 anchoring = false
@@ -44,16 +47,16 @@ end
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(note.mass / 40)
-	engine.hz(note.hz)
+	engine.hz(musicutil.note_num_to_freq(note.midi_note))
 	note.l = 1
 end
 
-function add_note(y, hz, mass)
+function add_note(midi_note, mass)
 	local note = {
 		x = playhead_x,
 		y = y or 32,
 		dx = 0,
-		hz = hz or 440,
+		midi_note = midi_note or 60,
 		mass = mass or 1,
 		l = 0,
 		anchor = anchoring
@@ -69,7 +72,7 @@ function double_width()
 		notes[i + n_notes] = {
 			x = note.x + width,
 			dx = note.dx,
-			hz = note.hz,
+			midi_note = note.midi_note,
 			mass = note.mass,
 			l = 0,
 			anchor = note.anchor
@@ -185,21 +188,34 @@ function tick()
 	end
 end
 
--- TODO: grid control too :)
 function midi_event(data)
 	local message = midi.to_msg(data)
 	if message.type == 'note_on' then
 		-- TODO: store note lengths
-		local hz = musicutil.note_num_to_freq(message.note)
 		local mass = (40 + message.vel) / 100
-		add_note(64 - message.note / 2, hz, mass)
+		add_note(message.note, mass)
+	end
+end
+
+function get_grid_note(x, y)
+	return 24 + x + (8 - y) * 5
+end
+
+function grid_key(x, y, z)
+	if z == 1 then
+		add_note(get_grid_note(x, y), 1)
 	end
 end
 
 function init()
 	
 	m = midi.connect(1).device
-	m.event = midi_event
+	if m ~= nil then
+		m.event = midi_event
+	end
+	
+	g = grid.connect()
+	g.key = grid_key
 
 	thebangs.add_additional_synth_params()
 	params:add_separator()
@@ -216,6 +232,7 @@ function init()
 		while true do
 			clock.sleep(1/15)
 			redraw()
+			grid_redraw()
 		end
 	end)
 end
@@ -245,7 +262,7 @@ function redraw()
 	for i, note in ipairs(notes) do
 		-- TODO: draw to indicate lengths
 		local x = note.x * scale + 0.5
-		local y = note.y
+		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		screen.circle(x, y, r)
 		if note.anchor then
@@ -267,6 +284,26 @@ function redraw()
 	end
 
 	screen.update()
+end
+
+function grid_redraw()
+	g:all(0)
+	
+	note_levels = {}
+	for i, note in ipairs(notes) do
+		note_levels[note.midi_note] = (note_levels[note.midi_note] or 0) + note.l
+	end
+	
+	for y = 1, g.rows do
+		for x = 1, g.cols do
+			local n = get_grid_note(x, y)
+			if note_levels[n] ~= nil then
+				g:led(x, y, math.floor(15 * math.min(1, note_levels[n])))
+			end
+		end
+	end
+
+	g:refresh()
 end
 
 function key(n, z)
