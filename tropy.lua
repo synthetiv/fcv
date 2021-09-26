@@ -12,16 +12,22 @@ draw_clock = nil
 m = nil
 g = nil
 
+-- TODO: make it possible to select notes and alter them as a group
 notes = {}
 erasing = false
 anchoring = false
 
 width = 4
 
+-- TODO: decouple motion calculations from playhead advancement
+-- that would allow play head to move in 16th note increments, or in a rhythmic pattern...
+-- "you could divide the x axis into zones and make the 'playhead' a highlighted zone instead...
+-- playhead jumps from zone to zone, notes start as play head crosses them and end as they leave
+-- play head region"
 tick_length = 1 / 24 -- ppqn
 
+-- TODO: make these overridable on a per-note basis
 d_bound = 2 / 3
-
 friction = 0.001
 inertia = 10000
 max_repulsion = 10
@@ -52,11 +58,14 @@ end
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(note.mass / 40)
+	-- TODO: support non-12TET
 	engine.hz(musicutil.note_num_to_freq(note.midi_note))
 	note.l = 1
 end
 
 function add_note(midi_note, mass)
+	-- TODO: make mass pitch-dependent...? or perhaps store velocity directly as such, and calculate
+	-- mass based on velocity and pitch...
 	local note = {
 		x = playhead_x,
 		y = y or 32,
@@ -149,6 +158,7 @@ function tick()
 					-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
 					-- max_repulsion keeps repulsion force from hitting infinity,
 					-- so that notes can float past one another instead of bouncing off
+					-- TODO: vary d_bound based on pitch / vel / mass
 					ddx = ddx + sign(d) * math.max(-max_repulsion, d_bound * (math.abs(d) - d_bound) / d / d)
 					-- TODO: handle note lengths too... a few options:
 					-- 1. ignore
