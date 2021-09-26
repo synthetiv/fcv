@@ -28,7 +28,8 @@ tick_length = 1 / 24 -- ppqn
 
 -- TODO: make these overridable on a per-note basis
 d_bound = 2 / 3
-friction = 0.001
+friction = 0.0001
+damping = 0.001
 inertia = 10000
 max_repulsion = 10
 dx_max = width / 2
@@ -177,10 +178,12 @@ function tick()
 			-- 'inertia' reduces the influence of attraction/repulsion forces
 			-- TODO: note that if mass < 0, ddx will be multiplied... which may account for some of the craziness you've observed
 			ddx = ddx / note.mass / inertia
-			-- 'friction' reduces speed over time, damping oscillation
-			-- when friction is 1, notes will find a comfortable spot and stay there, tending to cluster
+			-- 'damping' reduces speed over time, damping oscillation
+			-- when damping is 1, notes will find a comfortable spot and stay there, tending to cluster
 			-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
-			note.dx = ddx + note.dx * (1 - friction)
+			note.dx = ddx + note.dx * (1 - damping)
+			-- friction applies an opposing force, up to a limit defined by mass * friction constant
+			note.dx = sign(note.dx) * math.max(0, math.abs(note.dx) - note.mass * friction)
 			-- finally, clamp overall speed
 			if math.abs(note.dx) > dx_max then
 				note.dx = dx_max * sign(note.dx)
