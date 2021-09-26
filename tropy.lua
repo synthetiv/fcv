@@ -29,6 +29,8 @@ dx_max = width / 2
 
 l_decay = 0.9
 
+grid_octave = 2
+
 function wrap_distance(a, b)
 	local d = b - a
 	-- TODO: things get rather out of hand sometimes (notes speeding out of control), and it's not
@@ -202,7 +204,7 @@ function midi_event(data)
 end
 
 function get_grid_note(x, y)
-	return 24 + x + (8 - y) * 5
+	return grid_octave * 12 + x + (8 - y) * 5
 end
 
 function grid_key(x, y, z)
