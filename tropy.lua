@@ -295,14 +295,14 @@ function grid_redraw()
 	
 	note_levels = {}
 	for i, note in ipairs(notes) do
-		note_levels[note.midi_note] = (note_levels[note.midi_note] or 0) + note.l
+		note_levels[note.midi_note] = (note_levels[note.midi_note] or 2) + 15 * note.l
 	end
 	
 	for y = 1, g.rows do
 		for x = 1, g.cols do
 			local n = get_grid_note(x, y)
 			if note_levels[n] ~= nil then
-				g:led(x, y, math.floor(15 * math.min(1, note_levels[n])))
+				g:led(x, y, math.floor(math.min(15, note_levels[n])))
 			end
 		end
 	end
