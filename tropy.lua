@@ -55,26 +55,29 @@ function sign(n)
 	return -1
 end
 
+function get_note_hz(note)
+	return musicutil.note_num_to_freq(note.midi_note)
+end
+
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
-	engine.amp(note.mass / 40)
+	engine.amp(0.01 + note.velocity / 4000)
 	-- TODO: support non-12TET
-	engine.hz(musicutil.note_num_to_freq(note.midi_note))
+	engine.hz(get_note_hz(note))
 	note.l = 1
 end
 
-function add_note(midi_note, mass)
-	-- TODO: make mass pitch-dependent...? or perhaps store velocity directly as such, and calculate
-	-- mass based on velocity and pitch...
+function add_note(midi_note, velocity)
 	local note = {
 		x = playhead_x,
 		y = y or 32,
 		dx = 0,
 		midi_note = midi_note or 60,
-		mass = mass or 1,
+		velocity = velocity or 100,
 		l = 0,
 		anchor = anchoring
 	}
+	note.mass = (note.velocity / 127) / (get_note_hz(note) / 440)
 	table.insert(notes, note)
 	play_note(note)
 end
@@ -87,7 +90,7 @@ function double_width()
 			x = note.x + width,
 			dx = note.dx,
 			midi_note = note.midi_note,
-			mass = note.mass,
+			velocity = note.velocity,
 			l = 0,
 			anchor = note.anchor
 		}
@@ -142,6 +145,7 @@ function tick()
 	for i, note in ipairs(notes) do
 		if not note.anchor then
 			local ddx = 0
+			-- TODO: leftward drift... wtf? it's as if notes are responding only to *some* other notes' forces...
 			for j, other in ipairs(notes) do
 				if note ~= other then
 					local d = wrap_distance(note.x, other.x)
@@ -158,8 +162,12 @@ function tick()
 					-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
 					-- max_repulsion keeps repulsion force from hitting infinity,
 					-- so that notes can float past one another instead of bouncing off
-					-- TODO: vary d_bound based on pitch / vel / mass
-					ddx = ddx + sign(d) * math.max(-max_repulsion, d_bound * (math.abs(d) - d_bound) / d / d)
+					-- TODO: is it better to vary bound by "this" note's mass, or the "other" note's mass??
+					-- intuitively, you'd think it should be based on Other's, but then when a low note is close to both a low and a high note, the low note gets drawn to the high note...
+					-- OH HMM. PERHAPS the 'normalized' nature of this attraction/repulsion function is actually a problem...?
+					-- more massive notes should have more impact on others, overall, than less massive ones...
+					local note_bound = d_bound * note.mass
+					ddx = ddx + sign(d) * math.max(-max_repulsion, note_bound * (math.abs(d) - note_bound) / d / d)
 					-- TODO: handle note lengths too... a few options:
 					-- 1. ignore
 					-- 2. increase d_bound from centers of notes <-- this seems like the most interesting option
@@ -167,7 +175,8 @@ function tick()
 				end
 			end
 			-- 'inertia' reduces the influence of attraction/repulsion forces
-			ddx = ddx / (note.mass * inertia)
+			-- TODO: note that if mass < 0, ddx will be multiplied... which may account for some of the craziness you've observed
+			ddx = ddx / note.mass / inertia
 			-- 'friction' reduces speed over time, damping oscillation
 			-- when friction is 1, notes will find a comfortable spot and stay there, tending to cluster
 			-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
@@ -208,8 +217,7 @@ function midi_event(data)
 	local message = midi.to_msg(data)
 	if message.type == 'note_on' then
 		-- TODO: store note lengths
-		local mass = (40 + message.vel) / 100
-		add_note(message.note, mass)
+		add_note(message.note, message.vel)
 	end
 end
 
@@ -219,7 +227,7 @@ end
 
 function grid_key(x, y, z)
 	if z == 1 then
-		add_note(get_grid_note(x, y), 1)
+		add_note(get_grid_note(x, y), 100)
 	end
 end
 
