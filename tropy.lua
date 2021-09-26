@@ -20,10 +20,10 @@ width = 4
 
 tick_length = 1 / 24 -- ppqn
 
-d_bound = 1 / 2 -- notes will tend to stay 1/8th note apart
+d_bound = 2 / 3
 
-friction = 0.005
-inertia = 1000
+friction = 0.001
+inertia = 10000
 max_repulsion = 10
 dx_max = width / 2
 
