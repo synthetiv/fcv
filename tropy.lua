@@ -284,6 +284,11 @@ function redraw()
 		local x = note.x * scale + 0.5
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
+		-- draw bound
+		--screen.circle(x, y, d_bound * note.mass * scale)
+		--screen.level(2)
+		--screen.stroke()
+		-- draw note itself
 		screen.circle(x, y, r)
 		if note.anchor then
 			screen.circle(x, 64, 1)
