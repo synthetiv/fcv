@@ -58,15 +58,11 @@ function sign(n)
 	return 0
 end
 
-function get_note_hz(note)
-	return musicutil.note_num_to_freq(note.midi_note)
-end
-
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(0.01 + note.velocity / 4000)
 	-- TODO: support non-12TET
-	engine.hz(get_note_hz(note))
+	engine.hz(note.hz)
 	note.l = 1
 end
 
@@ -80,7 +76,9 @@ function add_note(midi_note, velocity)
 		l = 0,
 		anchor = anchoring
 	}
-	note.mass = (note.velocity / 127) / (get_note_hz(note) / 440)
+	note.hz = musicutil.note_num_to_freq(note.midi_note)
+	local octave = (note.midi_note - 60) / 12
+	note.mass = (note.velocity / 127) / math.pow(1.1, octave)
 	table.insert(notes, note)
 	play_note(note)
 end
@@ -95,7 +93,9 @@ function double_width()
 			midi_note = note.midi_note,
 			velocity = note.velocity,
 			l = 0,
-			anchor = note.anchor
+			anchor = note.anchor,
+			hz = note.hz,
+			mass = note.mass
 		}
 	end
 	width = width * 2
