@@ -27,12 +27,17 @@ width = 4
 tick_length = 1 / 24 -- ppqn
 
 -- TODO: make these overridable on a per-note basis
-d_bound = 2 / 3
-friction = 0.0001
-damping = 0.001
+d_bound = 1
+friction = 0
+damping = 0.01
 inertia = 1000
 max_repulsion = 10
 dx_max = width / 2
+home_attraction = 0.8
+
+current_phase = 0
+current_increment = math.pi * tick_length / 7
+current_force = 0.03
 
 l_decay = 0.9
 
@@ -58,17 +63,27 @@ function sign(n)
 	return 0
 end
 
+ji_ratios = { 1, 64/63, 1, 6/5, 1, 4/3, 1, 3/2, 24/15, 7/4, 16/9, 1 }
+root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
+root_freq = musicutil.note_num_to_freq(root_midi_note)
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(0.01 + note.velocity / 4000)
 	-- TODO: support non-12TET
-	engine.hz(note.hz)
+	local pitch = note.midi_note - root_midi_note
+	local octave = math.floor(pitch / 12)
+	local pitch_class = pitch % 12
+	local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
+	engine.hz(hz)
+	-- engine.hz(note.hz)
+	print(note.midi_note)
 	note.l = 1
 end
 
 function add_note(midi_note, velocity)
 	local note = {
 		x = playhead_x,
+		home = playhead_x,
 		y = y or 32,
 		dx = 0,
 		midi_note = midi_note or 60,
@@ -89,6 +104,7 @@ function double_width()
 		local note = notes[i]
 		notes[i + n_notes] = {
 			x = note.x + width,
+			home = note.home + width,
 			dx = note.dx,
 			midi_note = note.midi_note,
 			velocity = note.velocity,
@@ -111,6 +127,9 @@ function halve_width()
 			if note.x >= half_width then
 				note.x = note.x - half_width
 			end
+			if note.home >= half_width then
+				note.home = note.home - half_width
+			end
 			table.insert(new_notes, note)
 		end
 	end
@@ -124,6 +143,11 @@ end
 
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
 function tick()
+	current_phase = current_phase + current_increment
+	if current_phase > math.pi then
+		current_phase = current_phase - math.pi
+	end
+	engine.mod1(math.cos(current_phase) * 0.05 + 0.07)
 	-- move notes
 	for i, note in ipairs(notes) do
 		if note.anchor then
@@ -147,7 +171,10 @@ function tick()
 	-- update motion
 	for i, note in ipairs(notes) do
 		if not note.anchor then
-			local ddx = 0
+			-- tend homeward
+			local ddx = home_attraction * wrap_distance(note.x, note.home)
+			-- apply current
+			ddx = ddx + math.sin(current_phase + note.x / width * 2 * math.pi) * current_force
 			-- TODO: leftward drift... wtf? it's as if notes are responding only to *some* other notes' forces...
 			for j, other in ipairs(notes) do
 				if note ~= other then
@@ -241,6 +268,12 @@ function init()
 	params:add_separator()
 	thebangs.add_voicer_params()
 
+	params:set('algo', 4)
+	engine.release(2.4)
+	engine.mod1(0.1)
+	engine.mod2(3)
+	engine.cutoff(12000)
+
 	play_clock = clock.run(function()
 		while true do
 			clock.sync(tick_length)
@@ -284,6 +317,11 @@ function redraw()
 		local x = note.x * scale + 0.5
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
+		-- draw link to home
+		screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
+		screen.line(x, y)
+		screen.level(2)
+		screen.stroke()
 		-- draw bound
 		--screen.circle(x, y, d_bound * note.mass * scale)
 		--screen.level(2)
