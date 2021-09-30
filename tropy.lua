@@ -40,9 +40,7 @@ grid_octave = 2
 
 function wrap_distance(a, b)
 	local d = b - a
-	-- TODO: things get rather out of hand sometimes (notes speeding out of control), and it's not
-	-- always clear why/when. wrapping using while instead of if may have helped, but not 100%.
-	while d >= width / 2 do
+	while d > width / 2 do
 		d = d - width
 	end
 	while d < -width / 2 do
@@ -52,8 +50,12 @@ function wrap_distance(a, b)
 end
 
 function sign(n)
-	if n >= 0 then return 1 end
-	return -1
+	if n > 0 then
+		return 1
+	elseif n < 0 then
+		return -1
+	end
+	return 0
 end
 
 function get_note_hz(note)
