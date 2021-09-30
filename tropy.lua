@@ -30,7 +30,7 @@ tick_length = 1 / 24 -- ppqn
 d_bound = 2 / 3
 friction = 0.0001
 damping = 0.001
-inertia = 10000
+inertia = 1000
 max_repulsion = 10
 dx_max = width / 2
 
@@ -152,25 +152,16 @@ function tick()
 			for j, other in ipairs(notes) do
 				if note ~= other then
 					local d = wrap_distance(note.x, other.x)
-					-- TODO: set a max absolute distance beyond which notes don't influence one another -- allowing for separate groups/flocks
-					-- if these notes are in exactly the same place (which can happen when playing chords or
-					-- mashing keys), treat them as though they're slightly apart, with the first-added one
-					-- to the left of the second
-					if d == 0 then
-						d = 0.01 * (i > j and -1 or 1)
-					end
-					-- base attraction or repulsion: (|d|d_bound - d_bound^2) / (d^2)
+					local abs_d = math.abs(d)
 					-- 'd_bound' is the distance at which there is NO attraction or repulsion
-					-- below d_bound, repulsion increases to infinity as d approaches 0
-					-- above d_bound, attraction increases to 0.25 at 2*d_bound, then falls off gradually
-					-- max_repulsion keeps repulsion force from hitting infinity,
-					-- so that notes can float past one another instead of bouncing off
-					-- TODO: is it better to vary bound by "this" note's mass, or the "other" note's mass??
-					-- intuitively, you'd think it should be based on Other's, but then when a low note is close to both a low and a high note, the low note gets drawn to the high note...
-					-- OH HMM. PERHAPS the 'normalized' nature of this attraction/repulsion function is actually a problem...?
-					-- more massive notes should have more impact on others, overall, than less massive ones...
-					local note_bound = d_bound * note.mass
-					ddx = ddx + sign(d) * math.max(-max_repulsion, note_bound * (math.abs(d) - note_bound) / d / d)
+					local note_bound = d_bound * other.mass
+					if abs_d < 1.5 * note_bound then
+						-- repel
+						ddx = ddx + d - sign(d) * note_bound
+					else
+						-- attract
+						ddx = ddx - sign(d) * math.max(0, 2 * note_bound - math.abs(d))
+					end
 					-- TODO: handle note lengths too... a few options:
 					-- 1. ignore
 					-- 2. increase d_bound from centers of notes <-- this seems like the most interesting option
