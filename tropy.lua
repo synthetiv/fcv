@@ -20,7 +20,7 @@ anchoring = false
 width = 4
 
 -- TODO: decouple motion calculations from playhead advancement
--- that would allow play head to move in 16th note increments, or in a rhythmic pattern...
+-- that would allow play head to move in 16th note increments, or in a rhythmic pattern... <-- priority
 -- "you could divide the x axis into zones and make the 'playhead' a highlighted zone instead...
 -- playhead jumps from zone to zone, notes start as play head crosses them and end as they leave
 -- play head region"
@@ -42,6 +42,8 @@ current_force = 0.03
 l_decay = 0.9
 
 grid_octave = 2
+
+playing = false
 
 function wrap_distance(a, b)
 	local d = b - a
@@ -165,9 +167,11 @@ function tick()
 		note.l = note.l * l_decay
 	end
 	-- move playhead
-	playhead_x = playhead_x + tick_length
-	if playhead_x >= width then
-		playhead_x = playhead_x - width
+	if playing then
+		playhead_x = playhead_x + tick_length
+		if playhead_x >= width then
+			playhead_x = playhead_x - width
+		end
 	end
 	-- update motion
 	for i, note in ipairs(notes) do
@@ -242,6 +246,13 @@ function midi_event(data)
 	if message.type == 'note_on' then
 		-- TODO: store note lengths
 		add_note(message.note, message.vel)
+	elseif message.type == 'stop' then
+		playing = false
+	elseif message.type == 'start' then
+		playhead_x = -tick_length
+		playing = true
+	elseif message.type == 'continue' then
+		playing = true
 	end
 end
 
