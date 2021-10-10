@@ -231,13 +231,13 @@ function tick()
 	for i = #notes, 1, -1 do
 		local note = notes[i]
 		-- find intersection of two lines...
-		-- playhead line: x = playhead_x + tick_length * t
+		-- playhead line: x = playhead_x + tick_length * playing * t
 		-- note line: x = note.x + note.dx * t
-		-- playhead_x + tick_length * t = note.x + note.dx * t
-		-- tick_length * t - note.dx * t = note.x - playhead_x
-		-- t * (tick_length - note.dx) = note.x - playhead_x
+		-- playhead_x + tick_length * playing * t = note.x + note.dx * t
+		-- tick_length * playing * t - note.dx * t = note.x - playhead_x
+		-- t * (tick_length * playing - note.dx) = note.x - playhead_x
 		-- t = (note.x - playhead_x) / (tick_length - note.dx)
-		local t_collision = wrap_distance(playhead_x, note.x) / (tick_length - note.dx)
+		local t_collision = wrap_distance(playhead_x, note.x) / (tick_length * (playing and 1 or 0) - note.dx)
 		if t_collision > 0 and t_collision <= 1 then
 			if erasing then
 				table.remove(notes, i)
