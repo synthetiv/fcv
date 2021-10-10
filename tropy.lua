@@ -4,6 +4,7 @@ engine.name = 'Thebangs'
 thebangs = include 'thebangs/lib/thebangs_engine'
 
 musicutil = require 'musicutil'
+Voice = require 'voice'
 
 playhead_x = 0 -- TODO: hmmmm
 play_clock = nil
@@ -44,6 +45,9 @@ l_decay = 0.9
 grid_octave = 2
 
 playing = false
+recording = false
+
+non_recorded_notes = Voice.new(16)
 
 function wrap_distance(a, b)
 	local d = b - a
@@ -83,20 +87,26 @@ function play_note(note)
 end
 
 function add_note(midi_note, velocity)
+	midi_note = midi_note or 60
+	velocity = velocity or 100
 	local note = {
 		x = playhead_x,
 		home = playhead_x,
 		y = y or 32,
 		dx = 0,
-		midi_note = midi_note or 60,
-		velocity = velocity or 100,
+		midi_note = midi_note,
+		velocity = velocity,
+		hz = musicutil.note_num_to_freq(midi_note),
+		mass = (velocity / 127) / math.pow(1.1, (midi_note - 60) / 12),
 		l = 0,
 		anchor = anchoring
 	}
-	note.hz = musicutil.note_num_to_freq(note.midi_note)
-	local octave = (note.midi_note - 60) / 12
-	note.mass = (note.velocity / 127) / math.pow(1.1, octave)
-	table.insert(notes, note)
+	if recording then
+		table.insert(notes, note)
+	else
+		local slot = non_recorded_notes:get()
+		slot.note = note
+	end
 	play_note(note)
 end
 
@@ -239,6 +249,12 @@ function tick()
 			end
 		end
 	end
+	-- decay non-recorded notes
+	for i, slot in ipairs(non_recorded_notes.style.slots) do
+		if slot.note ~= nil then
+			slot.note.l = slot.note.l * l_decay
+		end
+	end
 end
 
 function midi_event(data)
@@ -261,8 +277,17 @@ function get_grid_note(x, y)
 end
 
 function grid_key(x, y, z)
-	if z == 1 then
-		add_note(get_grid_note(x, y), 100)
+	if x == 1 then
+		if y == 1 then
+			if z == 1 then
+				recording = not recording
+			end
+		end
+	else
+		if z == 1 then
+			-- TODO: record note ons/offs...
+			add_note(get_grid_note(x, y), 100)
+		end
 	end
 end
 
@@ -364,12 +389,19 @@ end
 function grid_redraw()
 	g:all(0)
 	
+	g:led(1, 1, recording and 10 or 0)
+	
 	note_levels = {}
 	for i, note in ipairs(notes) do
 		note_levels[note.midi_note] = (note_levels[note.midi_note] or 2) + 15 * note.l
 	end
+	for i, slot in ipairs(non_recorded_notes.style.slots) do
+		if slot.note ~= nil then
+			note_levels[slot.note.midi_note] = (note_levels[slot.note.midi_note] or 0) + 15 * slot.note.l
+		end
+	end
 	
-	for y = 1, g.rows do
+	for y = 2, g.rows do
 		for x = 1, g.cols do
 			local n = get_grid_note(x, y)
 			if note_levels[n] ~= nil then
