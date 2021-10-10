@@ -142,6 +142,7 @@ function halve_width()
 end
 
 -- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
+-- TODO: break this up into smaller functions that can be redefined on the fly
 function tick()
 	current_phase = current_phase + current_increment
 	if current_phase > math.pi then
