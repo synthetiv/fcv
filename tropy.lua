@@ -401,8 +401,8 @@ function grid_redraw()
 		end
 	end
 	
-	for y = 2, g.rows do
-		for x = 1, g.cols do
+	for y = 1, g.rows do
+		for x = 2, g.cols do
 			local n = get_grid_note(x, y)
 			if note_levels[n] ~= nil then
 				g:led(x, y, math.floor(math.min(15, note_levels[n])))
