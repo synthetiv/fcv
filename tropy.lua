@@ -69,20 +69,56 @@ function sign(n)
 	return 0
 end
 
-ji_ratios = { 1, 64/63, 1, 6/5, 1, 4/3, 1, 3/2, 24/15, 7/4, 16/9, 1 }
+midi_voices = Voice.new(8)
+
+ji_ratios = {
+	1,
+	64/63, -- 1 / 7 / 3 / 3
+	8/7, -- 1 / 7
+	7/6, -- 7 / 3
+	6/5, -- 3 / 5
+	4/3, -- 1 / 3
+	7/5, --
+	3/2, -- 3 / 1
+	32/21, -- 1 / 7 / 3
+	8/5, -- 1 / 5
+	7/4, -- 7 / 1
+	16/9 -- 1 / 3 / 3
+}
+function calculate_cents()
+	ji_cents = {}
+	for i, r in ipairs(ji_ratios) do
+		ji_cents[i] = math.log(r) * 1200 / math.log(2)
+	end
+end
+calculate_cents()
 root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
 root_freq = musicutil.note_num_to_freq(root_midi_note)
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(0.01 + note.velocity / 4000)
-	-- TODO: support non-12TET
 	local pitch = note.midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
 	local pitch_class = pitch % 12
-	local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
-	engine.hz(hz)
-	-- engine.hz(note.hz)
-	print(note.midi_note)
+	local cents = ji_cents[pitch_class + 1] + 1200 * octave
+	local note_out = math.floor(cents / 100) + root_midi_note
+	-- max MIDI bend = 16383; center = 8191
+	local bend_frac = ((cents % 100) / 100)
+	local bend_out = math.floor(8191.5 * (1 + bend_frac))
+	local midi_voice = midi_voices:get()
+	local channel = midi_voice.id + 8
+	m:pitchbend(bend_out, channel)
+	m:note_on(note_out, 100, channel)
+	clock.run(function()
+		clock.sleep(1/2)
+		m:note_off(note_out, 0, channel)
+	end)
+	midi_voice.on_steal = function()
+		m:note_off(note_out, 0, channel)
+	end
+	-- local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
+	-- engine.hz(hz)
+	print(note.midi_note, note_out, bend_frac, bend_out, channel)
 	note.l = 1
 end
 
