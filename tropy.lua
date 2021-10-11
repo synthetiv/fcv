@@ -7,6 +7,8 @@ musicutil = require 'musicutil'
 Voice = require 'voice'
 
 playhead_x = 0 -- TODO: hmmmm
+play_quant = 6
+play_ticks = 0
 play_clock = nil
 draw_clock = nil
 
@@ -18,7 +20,40 @@ notes = {}
 erasing = false
 anchoring = false
 
+function sort()
+	table.sort(notes, function(a, b)
+		return a.x < b.x
+	end)
+end
+-- a sufficiently successful sequence:
+-- current x, home, midi note
+-- .67672059549374 .58333333333327 63 = 14 =  2 =  8/7
+-- 1.3312846516363 1.333333333333  72 = 23 = 11 = 16/9
+-- 1.4866981696884 1.4166666666666 58 = 9  =  9 =  8/5
+-- 1.7618660074246 1.7499999999999 69 = 20 =  8 = 32/21
+-- 2.132197774293  2.1666666666666 64 = 15 =  3 =  7/6
+-- 2.4836666000621 2.4999999999999 61 = 12 =  0 =  1/1
+-- 2.8540553411407 3.0833333333333 50 = 1  =  1 = 64/63
+-- 2.939992118522  2.7916666666666 62 = 13 =  1 = 64/63
+-- 3.3271179416657 3.4583333333333 62 = 13 =  1 = 64/63
+-- 3.6888339679937 3.7916666666666 49 = 0  =  0 =  1/1
+-- 4.5219987041017 4.5833333333333 63 = 14 =  2 =  8/7
+-- 5.2290980524288 5.333333333333  72 = 23 = 11 = 16/9
+-- 5.4086146572805 5.4166666666666 58 = 9  =  9 =  8/5
+-- 5.7023812998105 5.7499999999999 69 = 20 =  8 = 32/21
+-- 6.1343900537404 6.1666666666666 64 = 15 =  3 =  7/6
+-- 6.4943222992263 6.583333333333  53 = 4  =  4 =  6/5
+-- 6.6226535705355 6.4999999999999 61 = 12 =  0 =  1/1
+-- 6.930494659312  7.0833333333333 50 = 1  =  1 = 64/63
+-- 7.0169963005057 6.7916666666666 62 = 13 =  1 = 64/63
+-- 7.4153014639616 7.4583333333333 62 = 13 =  1 = 64/63
+-- 7.7227328302841 7.6666666666662 57 = 8  =  8 = 32/21
+-- 7.9339618998232 7.7916666666666 49 = 0  =  0 =  1/1
+
 width = 4
+
+-- TODO: quantization
+-- TODO: OT capture
 
 -- TODO: decouple motion calculations from playhead advancement
 -- that would allow play head to move in 16th note increments, or in a rhythmic pattern... <-- priority
@@ -28,9 +63,9 @@ width = 4
 tick_length = 1 / 24 -- ppqn
 
 -- TODO: make these overridable on a per-note basis
-d_bound = 1
+d_bound = 0.5
 friction = 0
-damping = 0.01
+damping = 0.005
 inertia = 1000
 max_repulsion = 10
 dx_max = width / 2
@@ -71,6 +106,12 @@ end
 
 midi_voices = Voice.new(8)
 
+function calculate_cents()
+	ji_cents = {}
+	for i, r in ipairs(ji_ratios) do
+		ji_cents[i] = math.log(r) * 1200 / math.log(2)
+	end
+end
 ji_ratios = {
 	1,
 	64/63, -- 1 / 7 / 3 / 3
@@ -85,12 +126,6 @@ ji_ratios = {
 	7/4, -- 7 / 1
 	16/9 -- 1 / 3 / 3
 }
-function calculate_cents()
-	ji_cents = {}
-	for i, r in ipairs(ji_ratios) do
-		ji_cents[i] = math.log(r) * 1200 / math.log(2)
-	end
-end
 calculate_cents()
 root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
 root_freq = musicutil.note_num_to_freq(root_midi_note)
@@ -99,6 +134,12 @@ function play_note(note)
 	engine.amp(0.01 + note.velocity / 4000)
 	local pitch = note.midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
+	local r = math.random(2)
+	if r > 1 then
+		octave = octave + 1
+	elseif r > 0 then
+		octave = octave - 1
+	end
 	local pitch_class = pitch % 12
 	local cents = ji_cents[pitch_class + 1] + 1200 * octave
 	local note_out = math.floor(cents / 100) + root_midi_note
@@ -213,10 +254,15 @@ function tick()
 		note.l = note.l * l_decay
 	end
 	-- move playhead
+	local quant_length = tick_length * play_quant
 	if playing then
 		playhead_x = playhead_x + tick_length
 		if playhead_x >= width then
 			playhead_x = playhead_x - width
+		end
+		play_ticks = play_ticks + 1
+		if play_ticks >= play_quant then
+			play_ticks = play_ticks - play_quant
 		end
 	end
 	-- update motion
@@ -261,27 +307,26 @@ function tick()
 			end
 		end
 	end
-	-- detect note-playhead collisions
-	-- count down instead of up because we may end up removing elements from 'notes', which will
-	-- affect elements at indices > i
-	for i = #notes, 1, -1 do
-		local note = notes[i]
-		-- find intersection of two lines...
-		-- playhead line: x = playhead_x + tick_length * playing * t
-		-- note line: x = note.x + note.dx * t
-		-- playhead_x + tick_length * playing * t = note.x + note.dx * t
-		-- tick_length * playing * t - note.dx * t = note.x - playhead_x
-		-- t * (tick_length * playing - note.dx) = note.x - playhead_x
-		-- t = (note.x - playhead_x) / (tick_length - note.dx)
-		local t_collision = wrap_distance(playhead_x, note.x) / (tick_length * (playing and 1 or 0) - note.dx)
-		if t_collision > 0 and t_collision <= 1 then
-			if erasing then
-				table.remove(notes, i)
-			else
-				clock.run(function()
-					clock.sleep(t_collision * tick_length * clock.get_beat_sec())
+	if playing and play_ticks == 0 then
+		-- detect note-playhead collisions
+		-- count down instead of up because we may end up removing elements from 'notes', which will
+		-- affect elements at indices > i
+		for i = #notes, 1, -1 do
+			local note = notes[i]
+			-- find intersection of two lines...
+			-- playhead line: x = playhead_x + quant_length * playing * t
+			-- note line: x = note.x + note.dx * t
+			-- playhead_x + quant_length * playing * t = note.x + note.dx * t
+			-- quant_length * playing * t - note.dx * t = note.x - playhead_x
+			-- t * (quant_length * playing - note.dx) = note.x - playhead_x
+			-- t = (note.x - playhead_x) / (quant_length - note.dx)
+			local t_collision = wrap_distance(playhead_x, note.x) / (quant_length * (playing and 1 or 0) - note.dx)
+			if t_collision > 0 and t_collision <= 1 then
+				if erasing then
+					table.remove(notes, i)
+				else
 					play_note(note)
-				end)
+				end
 			end
 		end
 	end
@@ -302,6 +347,7 @@ function midi_event(data)
 		playing = false
 	elseif message.type == 'start' then
 		playhead_x = -tick_length
+		play_ticks = play_quant
 		playing = true
 	elseif message.type == 'continue' then
 		playing = true
@@ -391,10 +437,10 @@ function redraw()
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		-- draw link to home
-		screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
-		screen.line(x, y)
-		screen.level(2)
-		screen.stroke()
+		-- screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
+		-- screen.line(x, y)
+		-- screen.level(2)
+		-- screen.stroke()
 		-- draw bound
 		--screen.circle(x, y, d_bound * note.mass * scale)
 		--screen.level(2)
