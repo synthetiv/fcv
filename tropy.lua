@@ -2,7 +2,6 @@
 
 engine.name = 'Thebangs'
 thebangs = include 'thebangs/lib/thebangs_engine'
-depths = include 'lib/depths'
 
 musicutil = require 'musicutil'
 Voice = require 'voice'
@@ -134,12 +133,33 @@ calculate_cents()
 root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
 root_freq = musicutil.note_num_to_freq(root_midi_note)
 
+esq_voices = Voice.new(8)
+
+function esq_cents(cents, velocity, length)
+	local note_out = math.floor(cents / 100) + root_midi_note
+	-- max MIDI bend = 16383; center = 8191
+	local bend_frac = ((cents % 100) / 100)
+	local bend_out = math.floor(8191.5 * (1 + bend_frac))
+	-- TODO: voice enable/disable
+	local esq_voice = esq_voices:get()
+	local channel = esq_voice.id + 8
+	m:pitchbend(bend_out, channel)
+	m:note_on(note_out, velocity, channel)
+	clock.run(function()
+		clock.sleep(length)
+		m:note_off(note_out, 0, channel)
+	end)
+	esq_voice.on_steal = function()
+		m:note_off(note_out, 0, channel)
+	end
+end
+
 function play_note(note)
 	local pitch = note.midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
 	local pitch_class = pitch % 12
 	local cents = ji_cents[pitch_class + 1] + 1200 * octave
-	depths.esq_cents(cents, 100, 1/2)
+	esq_cents(cents, 100, 1/2)
 	note.l = 1
 end
 
