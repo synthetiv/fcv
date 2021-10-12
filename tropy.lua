@@ -2,6 +2,7 @@
 
 engine.name = 'Thebangs'
 thebangs = include 'thebangs/lib/thebangs_engine'
+depths = include 'lib/depths'
 
 musicutil = require 'musicutil'
 Voice = require 'voice'
@@ -104,8 +105,6 @@ function sign(n)
 	return 0
 end
 
-midi_voices = Voice.new(8)
-
 function calculate_cents()
 	ji_cents = {}
 	for i, r in ipairs(ji_ratios) do
@@ -132,36 +131,11 @@ root_midi_note = 49 -- just happens to be the root note of the sequence that's c
 root_freq = musicutil.note_num_to_freq(root_midi_note)
 
 function play_note(note)
-	-- TODO: use arbitrary callbacks as well or instead
-	engine.amp(0.01 + note.velocity / 4000)
 	local pitch = note.midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
-	local r = math.random(2)
-	if r > 1 then
-		octave = octave + 1
-	elseif r > 0 then
-		octave = octave - 1
-	end
 	local pitch_class = pitch % 12
 	local cents = ji_cents[pitch_class + 1] + 1200 * octave
-	local note_out = math.floor(cents / 100) + root_midi_note
-	-- max MIDI bend = 16383; center = 8191
-	local bend_frac = ((cents % 100) / 100)
-	local bend_out = math.floor(8191.5 * (1 + bend_frac))
-	local midi_voice = midi_voices:get()
-	local channel = midi_voice.id + 8
-	m:pitchbend(bend_out, channel)
-	m:note_on(note_out, 100, channel)
-	clock.run(function()
-		clock.sleep(1/2)
-		m:note_off(note_out, 0, channel)
-	end)
-	midi_voice.on_steal = function()
-		m:note_off(note_out, 0, channel)
-	end
-	-- local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
-	-- engine.hz(hz)
-	print(note.midi_note, note_out, bend_frac, bend_out, channel)
+	depths.esq_cents(cents, 100, 1/2)
 	note.l = 1
 end
 
