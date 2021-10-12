@@ -50,9 +50,25 @@ end
 -- 7.7227328302841 7.6666666666662 57 = 8  =  8 = 32/21
 -- 7.9339618998232 7.7916666666666 49 = 0  =  0 =  1/1
 
+function notes_where(p)
+	local selection = {}
+	for i, note in ipairs(notes) do
+		if p(note) then
+			table.insert(selection, note)
+		end
+	end
+	return selection
+end
+
+function do_where(p, a)
+	local selection = notes_where(p)
+	for i, note in ipairs(selection) do
+		a(note)
+	end
+end
+
 width = 4
 
--- TODO: quantization
 -- TODO: OT capture
 
 -- TODO: decouple motion calculations from playhead advancement
@@ -108,12 +124,13 @@ function sign(n)
 	return 0
 end
 
+ji_cents = {}
 function calculate_cents()
-	ji_cents = {}
 	for i, r in ipairs(ji_ratios) do
 		ji_cents[i] = math.log(r) * 1200 / math.log(2)
 	end
 end
+
 ji_ratios = {
 	1,
 	64/63, -- 1 / 7 / 3 / 3
@@ -305,6 +322,7 @@ function tick()
 		end
 	end
 	if playing and play_ticks == 0 then
+		-- TODO: fix missed notes
 		-- detect note-playhead collisions
 		-- count down instead of up because we may end up removing elements from 'notes', which will
 		-- affect elements at indices > i
@@ -454,10 +472,10 @@ function redraw()
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		-- draw link to home
-		-- screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
-		-- screen.line(x, y)
-		-- screen.level(2)
-		-- screen.stroke()
+		screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
+		screen.line(x, y)
+		screen.level(2)
+		screen.stroke()
 		-- draw bound
 		--screen.circle(x, y, d_bound * note.mass * scale)
 		--screen.level(2)
