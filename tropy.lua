@@ -6,7 +6,7 @@ thebangs = include 'thebangs/lib/thebangs_engine'
 musicutil = require 'musicutil'
 Voice = require 'voice'
 
-playhead_x = 0 -- TODO: hmmmm
+playhead_x = 0
 play_quant = 6
 play_ticks = 0
 play_clock = nil
@@ -15,7 +15,7 @@ draw_clock = nil
 m = nil
 g = nil
 
--- TODO: make it possible to select notes and alter them as a group
+-- TODO: make it possible to select notes and alter them as a group (select()...)
 notes = {}
 erasing = false
 anchoring = false
@@ -232,8 +232,6 @@ function halve_width()
 	notes = new_notes
 end
 
--- TODO: create repeating note groups -- all repetitions exert + are subject to influence, but their distance from one another is fixed
--- TODO: break this up into smaller functions that can be redefined on the fly
 function tick()
 	current_phase = current_phase + current_increment
 	if current_phase > math.pi then
@@ -274,7 +272,6 @@ function tick()
 			local ddx = home_attraction * wrap_distance(note.x, note.home)
 			-- apply current
 			ddx = ddx + math.sin(current_phase + note.x / width * 2 * math.pi) * current_force
-			-- TODO: leftward drift... wtf? it's as if notes are responding only to *some* other notes' forces...
 			for j, other in ipairs(notes) do
 				if note ~= other then
 					local d = wrap_distance(note.x, other.x)
@@ -489,7 +486,6 @@ function grid_redraw()
 end
 
 function key(n, z)
-	-- TODO: key combos for halve/double?
 	if n == 1 then
 		anchoring = z == 1
 	elseif n == 2 then
