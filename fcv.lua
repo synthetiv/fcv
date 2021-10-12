@@ -15,7 +15,6 @@ draw_clock = nil
 m = nil
 g = nil
 
--- TODO: make it possible to select notes and alter them as a group (select()...)
 notes = {}
 erasing = false
 anchoring = false
