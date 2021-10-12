@@ -7,10 +7,13 @@ musicutil = require 'musicutil'
 Voice = require 'voice'
 
 playhead_x = 0
-play_quant = 6
-play_ticks = 0
 play_clock = nil
 draw_clock = nil
+
+ppqn = 24
+
+play_quant = 6
+play_ticks = 0
 
 m = nil
 g = nil
@@ -70,13 +73,6 @@ width = 4
 
 -- TODO: OT capture
 
--- TODO: decouple motion calculations from playhead advancement
--- that would allow play head to move in 16th note increments, or in a rhythmic pattern... <-- priority
--- "you could divide the x axis into zones and make the 'playhead' a highlighted zone instead...
--- playhead jumps from zone to zone, notes start as play head crosses them and end as they leave
--- play head region"
-tick_length = 1 / 24 -- ppqn
-
 -- TODO: make these overridable on a per-note basis
 d_bound = 0.5
 friction = 0
@@ -87,7 +83,7 @@ dx_max = width / 2
 home_attraction = 0.8
 
 current_phase = 0
-current_increment = math.pi * tick_length / 7
+current_increment = math.pi / ppqn / 7
 current_force = 0.03
 
 l_decay = 0.9
@@ -268,9 +264,9 @@ function tick()
 		note.l = note.l * l_decay
 	end
 	-- move playhead
-	local quant_length = tick_length * play_quant
+	local quant_length = play_quant / ppqn
 	if playing then
-		playhead_x = playhead_x + tick_length
+		playhead_x = playhead_x + 1 / ppqn
 		if playhead_x >= width then
 			playhead_x = playhead_x - width
 		end
@@ -374,7 +370,7 @@ function midi_event(data)
 	elseif message.type == 'stop' then
 		playing = false
 	elseif message.type == 'start' then
-		playhead_x = -tick_length
+		playhead_x = -1 / ppqn
 		play_ticks = play_quant
 		playing = true
 	elseif message.type == 'continue' then
@@ -433,7 +429,7 @@ function init()
 
 	play_clock = clock.run(function()
 		while true do
-			clock.sync(tick_length)
+			clock.sync(1 / ppqn)
 			tick()
 		end
 	end)
