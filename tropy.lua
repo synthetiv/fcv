@@ -127,8 +127,10 @@ ji_ratios = {
 	16/9 -- 1 / 3 / 3
 }
 calculate_cents()
+
 root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
 root_freq = musicutil.note_num_to_freq(root_midi_note)
+
 function play_note(note)
 	-- TODO: use arbitrary callbacks as well or instead
 	engine.amp(0.01 + note.velocity / 4000)
@@ -411,24 +413,20 @@ end
 
 function redraw()
 	local scale = 127 / width
-
 	screen.clear()
 	screen.aa(0)
-
 	-- draw beats
 	screen.level(1)
 	for i = 0, width do
 		screen.rect(i * scale, 0, 1, 1)
 		screen.fill()
 	end
-
 	-- draw playhead
 	screen.move(playhead_x * scale + 0.5, 0)
 	screen.line_rel(0, 64)
 	screen.line_width(1)
 	screen.level(1)
 	screen.stroke()
-	
 	-- draw notes
 	screen.aa(1)
 	for i, note in ipairs(notes) do
@@ -464,15 +462,12 @@ function redraw()
 		screen.level(3 + math.floor(12 * note.l))
 		screen.fill()
 	end
-
 	screen.update()
 end
 
 function grid_redraw()
 	g:all(0)
-	
 	g:led(1, 1, recording and 10 or 0)
-	
 	note_levels = {}
 	for i, note in ipairs(notes) do
 		note_levels[note.midi_note] = (note_levels[note.midi_note] or 2) + 15 * note.l
@@ -482,7 +477,6 @@ function grid_redraw()
 			note_levels[slot.note.midi_note] = (note_levels[slot.note.midi_note] or 0) + 15 * slot.note.l
 		end
 	end
-	
 	for y = 1, g.rows do
 		for x = 2, g.cols do
 			local n = get_grid_note(x, y)
@@ -491,7 +485,6 @@ function grid_redraw()
 			end
 		end
 	end
-
 	g:refresh()
 end
 
