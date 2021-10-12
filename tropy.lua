@@ -83,6 +83,10 @@ grid_octave = 2
 playing = false
 recording = false
 
+grid_erasing = false
+keys_held = {}
+n_keys = 128
+
 non_recorded_notes = Voice.new(16)
 
 function wrap_distance(a, b)
@@ -298,7 +302,21 @@ function tick()
 				if erasing then
 					table.remove(notes, i)
 				else
-					play_note(note)
+					local did_erase = false
+					if grid_erasing then
+						for k = 1, n_keys do
+							if not did_erase and keys_held[k] then
+								local held_note = get_grid_id_note(k)
+								if held_note == note.midi_note then
+									table.remove(notes, i)
+									did_erase = true
+								end
+							end
+						end
+					end
+					if not did_erase then
+						play_note(note)
+					end
 				end
 			end
 		end
@@ -331,15 +349,25 @@ function get_grid_note(x, y)
 	return grid_octave * 12 + x + (8 - y) * 5
 end
 
+function get_grid_id_note(id)
+	local x = (id - 1) % g.cols + 1
+	local y = math.floor(id / g.cols) + 1
+	return get_grid_note(x, y)
+end
+
 function grid_key(x, y, z)
 	if x == 1 then
 		if y == 1 then
 			if z == 1 then
 				recording = not recording
 			end
+		elseif y == 2 then
+			grid_erasing = z == 1
 		end
 	else
-		if z == 1 then
+		local id = x + (y - 1) * g.cols
+		keys_held[id] = z == 1
+		if not grid_erasing and z == 1 then
 			-- TODO: record note ons/offs...
 			add_note(get_grid_note(x, y), 100)
 		end
@@ -438,7 +466,8 @@ end
 
 function grid_redraw()
 	g:all(0)
-	g:led(1, 1, recording and 10 or 0)
+	g:led(1, 1, recording and 10 or 1)
+	g:led(1, 2, grid_erasing and 10 or 1)
 	note_levels = {}
 	for i, note in ipairs(notes) do
 		note_levels[note.midi_note] = (note_levels[note.midi_note] or 2) + 15 * note.l
