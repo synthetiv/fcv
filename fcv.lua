@@ -22,9 +22,9 @@ notes = {}
 erasing = false
 anchoring = false
 
-function sort()
+function sort_notes()
 	table.sort(notes, function(a, b)
-		return a.x < b.x
+		return a.home < b.home
 	end)
 end
 -- a sufficiently successful sequence:
@@ -66,7 +66,14 @@ function do_where(p, a)
 	local selection = notes_where(p)
 	for i, note in ipairs(selection) do
 		a(note)
+		-- clean up, if needed (like if we just added a random offset to all notes)
+		note.x = note.x % width
+		note.home = note.home % width
 	end
+end
+
+function do_all(a)
+	do_where(function() return true end, a)
 end
 
 width = 4
@@ -192,6 +199,7 @@ function add_note(midi_note, velocity)
 	}
 	if recording then
 		table.insert(notes, note)
+		sort_notes()
 	else
 		local slot = non_recorded_notes:get()
 		slot.note = note
@@ -443,8 +451,9 @@ function init()
 	end)
 end
 
+-- TODO: bronchi, centipede legs
 function redraw()
-	local scale = 127 / width
+	local scale = 127 / width -- columns 1 and 128 will be identical; 127 unique columns of px
 	screen.clear()
 	screen.aa(0)
 	-- draw beats
@@ -467,14 +476,24 @@ function redraw()
 		local y = 64 - note.midi_note / 2
 		local r = note.anchor and 1.4 or 1
 		-- draw link to home
-		screen.move(x + wrap_distance(note.x, note.home) * scale, 64)
+		local home_distance = wrap_distance(note.x, note.home) * scale
+		screen.move(x + home_distance, 64)
 		screen.line(x, y)
 		screen.level(2)
 		screen.stroke()
-		-- draw bound
-		--screen.circle(x, y, d_bound * note.mass * scale)
-		--screen.level(2)
-		--screen.stroke()
+		-- wrap across left or right edge if needed
+		if x + home_distance < 0 then
+			screen.move(x + home_distance + 127, 64)
+			screen.line(x + 127, y)
+			screen.level(2)
+			screen.stroke()
+		elseif x + home_distance > 127 then
+			screen.move(x + home_distance - 127, 64)
+			screen.line(x - 127, y)
+			screen.level(2)
+			screen.stroke()
+		end
+		-- TODO: wrap: if a line from x to home or home to x would cross 0
 		-- draw note itself
 		screen.circle(x, y, r)
 		if note.anchor then
