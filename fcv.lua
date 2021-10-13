@@ -111,6 +111,8 @@ grid_erasing = false
 keys_held = {}
 n_keys = 128
 
+k1_held = false
+
 non_recorded_notes = Voice.new(16)
 
 function wrap_distance(a, b)
@@ -452,26 +454,28 @@ local y_center = 32.5
 function redraw()
 	local scale = screen_width / width
 	screen.clear()
-	screen.aa(0)
 	screen.blend_mode('add')
-	-- draw beats
-	screen.level(1)
-	for i = 0, width do
-		local level = 1
-		if i % 4 == 0 then
-			level = 2
+	if k1_held then
+		screen.aa(0)
+		-- draw beats
+		screen.level(1)
+		for i = 0, width do
+			local level = 1
+			if i % 4 == 0 then
+				level = 2
+			end
+			screen.rect(i * scale, 0, 1, 1)
+			screen.rect(i * scale, 64, 1, -1)
+			screen.level(level)
+			screen.fill()
 		end
-		screen.rect(i * scale, 0, 1, 1)
-		screen.rect(i * scale, 64, 1, -1)
-		screen.level(level)
-		screen.fill()
+		-- draw playhead
+		screen.move(playhead_x * scale + 0.5, 0)
+		screen.line_rel(0, 64)
+		screen.line_width(1)
+		screen.level(1)
+		screen.stroke()
 	end
-	-- draw playhead
-	screen.move(playhead_x * scale + 0.5, 0)
-	screen.line_rel(0, 64)
-	screen.line_width(1)
-	screen.level(1)
-	screen.stroke()
 	screen.aa(1)
 	-- draw notes
 	screen.move(-127, y_center) -- TODO: ?
@@ -480,7 +484,7 @@ function redraw()
 			local home_x = (note.home * scale) % screen_width + 0.5 + offset
 			local x = home_x + wrap_distance(note.home, note.x) * scale
 			-- TODO: only draw this note if we can see it or it's adjacent to one we can see
-			local home_y = y_center - (note.midi_note - root_midi_note) / (2 + math.abs(wrap_distance(note.home, note.x)) * scale / 3)
+			local home_y = y_center - (note.midi_note - root_midi_note) / (3 + math.abs(wrap_distance(note.home, note.x)) * scale / 5)
 			local y = y_center - (note.midi_note - root_midi_note) / 2
 			local offset = 0
 			screen.line(home_x, home_y)
@@ -529,6 +533,7 @@ end
 
 function key(n, z)
 	if n == 1 then
+		k1_held = z == 1
 	elseif n == 2 then
 		erasing = z == 1
 	elseif n == 3 then
