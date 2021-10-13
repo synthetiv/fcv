@@ -12,15 +12,15 @@ draw_clock = nil
 
 ppqn = 24
 
-play_quant = 6
-play_ticks = 0
+quant_ticks = 1
+quant_accumulator = 0
+play_x = 0
 
 m = nil
 g = nil
 
 notes = {}
 erasing = false
-anchoring = false
 
 function sort_notes()
 	table.sort(notes, function(a, b)
@@ -76,6 +76,13 @@ function do_all(a)
 	do_where(function() return true end, a)
 end
 
+function shift(d)
+	do_all(function(note)
+		note.x = note.x + d
+		note.home = note.home + d
+	end)
+end
+
 width = 4
 
 -- TODO: OT capture
@@ -85,13 +92,13 @@ d_bound = 0.5
 friction = 0
 damping = 0.005
 inertia = 1000
-max_repulsion = 10
+mass = 0.8
 dx_max = width / 2
-home_attraction = 0.8
+homing = 0.8
 
 current_phase = 0
 current_increment = math.pi / ppqn / 7
-current_force = 0.03
+current_force = 0.05
 
 l_decay = 0.9
 
@@ -193,9 +200,7 @@ function add_note(midi_note, velocity)
 		midi_note = midi_note,
 		velocity = velocity,
 		hz = musicutil.note_num_to_freq(midi_note),
-		mass = (velocity / 127) / math.pow(1.1, (midi_note - 60) / 12),
-		l = 0,
-		anchor = anchoring
+		l = 0
 	}
 	if recording then
 		table.insert(notes, note)
@@ -208,6 +213,7 @@ function add_note(midi_note, velocity)
 end
 
 function double_width()
+	-- TODO: fix the thing where a note sometimes gets wrapped or something
 	local n_notes = #notes
 	for i = 1, n_notes do
 		local note = notes[i]
@@ -218,9 +224,7 @@ function double_width()
 			midi_note = note.midi_note,
 			velocity = note.velocity,
 			l = 0,
-			anchor = note.anchor,
-			hz = note.hz,
-			mass = note.mass
+			hz = note.hz
 		}
 	end
 	width = width * 2
@@ -258,73 +262,64 @@ function tick()
 	engine.mod1(math.cos(current_phase) * 0.05 + 0.07)
 	-- move notes
 	for i, note in ipairs(notes) do
-		if note.anchor then
-			note.dx = 0
-		else
-			note.x = note.x + note.dx
-			while note.x < 0 do
-				note.x = note.x + width
-			end
-			while note.x >= width do
-				note.x = note.x - width
-			end
+		note.x = note.x + note.dx
+		while note.x < 0 do
+			note.x = note.x + width
+		end
+		while note.x >= width do
+			note.x = note.x - width
 		end
 		note.l = note.l * l_decay
 	end
 	-- move playhead
-	local quant_length = play_quant / ppqn
+	local quant = quant_ticks / ppqn
 	if playing then
 		playhead_x = playhead_x + 1 / ppqn
 		if playhead_x >= width then
 			playhead_x = playhead_x - width
 		end
-		play_ticks = play_ticks + 1
-		if play_ticks >= play_quant then
-			play_ticks = play_ticks - play_quant
-		end
+		quant_accumulator = (quant_accumulator + 1) % quant_ticks
 	end
 	-- update motion
 	for i, note in ipairs(notes) do
-		if not note.anchor then
-			-- tend homeward
-			local ddx = home_attraction * wrap_distance(note.x, note.home)
-			-- apply current
-			ddx = ddx + math.sin(current_phase + note.x / width * 2 * math.pi) * current_force
-			for j, other in ipairs(notes) do
-				if note ~= other then
-					local d = wrap_distance(note.x, other.x)
-					local abs_d = math.abs(d)
-					-- 'd_bound' is the distance at which there is NO attraction or repulsion
-					local note_bound = d_bound * other.mass
-					if abs_d < 1.5 * note_bound then
-						-- repel
-						ddx = ddx + d - sign(d) * note_bound
-					else
-						-- attract
-						ddx = ddx - sign(d) * math.max(0, 2 * note_bound - math.abs(d))
-					end
-					-- TODO: handle note lengths too... a few options:
-					-- 1. ignore
-					-- 2. increase d_bound from centers of notes <-- this seems like the most interesting option
-					-- 3. get distances between starts + ends of notes and choose the smallest
+		-- tend homeward
+		local ddx = homing * wrap_distance(note.x, note.home)
+		-- apply current
+		ddx = ddx + math.sin(current_phase + note.x / width * 2 * math.pi) * current_force
+		for j, other in ipairs(notes) do
+			if note ~= other then
+				local d = wrap_distance(note.x, other.x)
+				local abs_d = math.abs(d)
+				-- 'd_bound' is the distance at which there is NO attraction or repulsion
+				local note_bound = d_bound * mass
+				if abs_d < 1.5 * note_bound then
+					-- repel
+					ddx = ddx + d - sign(d) * note_bound
+				else
+					-- attract
+					ddx = ddx - sign(d) * math.max(0, 2 * note_bound - math.abs(d))
 				end
-			end
-			-- 'inertia' reduces the influence of attraction/repulsion forces
-			-- TODO: note that if mass < 0, ddx will be multiplied... which may account for some of the craziness you've observed
-			ddx = ddx / note.mass / inertia
-			-- 'damping' reduces speed over time, damping oscillation
-			-- when damping is 1, notes will find a comfortable spot and stay there, tending to cluster
-			-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
-			note.dx = ddx + note.dx * (1 - damping)
-			-- friction applies an opposing force, up to a limit defined by mass * friction constant
-			note.dx = sign(note.dx) * math.max(0, math.abs(note.dx) - note.mass * friction)
-			-- finally, clamp overall speed
-			if math.abs(note.dx) > dx_max then
-				note.dx = dx_max * sign(note.dx)
+				-- TODO: handle note lengths too... a few options:
+				-- 1. ignore
+				-- 2. increase d_bound from centers of notes <-- this seems like the most interesting option
+				-- 3. get distances between starts + ends of notes and choose the smallest
 			end
 		end
+		-- 'inertia' reduces the influence of attraction/repulsion forces
+		-- TODO: note that if mass < 0, ddx will be multiplied... which may account for some of the craziness you've observed
+		ddx = ddx / mass / inertia
+		-- 'damping' reduces speed over time, damping oscillation
+		-- when damping is 1, notes will find a comfortable spot and stay there, tending to cluster
+		-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
+		note.dx = ddx + note.dx * (1 - damping)
+		-- friction applies an opposing force, up to a limit defined by mass * friction constant
+		note.dx = sign(note.dx) * math.max(0, math.abs(note.dx) - mass * friction)
+		-- finally, clamp overall speed
+		if math.abs(note.dx) > dx_max then
+			note.dx = dx_max * sign(note.dx)
+		end
 	end
-	if playing and play_ticks == 0 then
+	if playing and quant_accumulator == 0 then
 		-- TODO: fix missed notes
 		-- detect note-playhead collisions
 		-- count down instead of up because we may end up removing elements from 'notes', which will
@@ -332,13 +327,13 @@ function tick()
 		for i = #notes, 1, -1 do
 			local note = notes[i]
 			-- find intersection of two lines...
-			-- playhead line: x = playhead_x + quant_length * playing * t
+			-- playhead line: x = playhead_x + quant * playing * t
 			-- note line: x = note.x + note.dx * t
-			-- playhead_x + quant_length * playing * t = note.x + note.dx * t
-			-- quant_length * playing * t - note.dx * t = note.x - playhead_x
-			-- t * (quant_length * playing - note.dx) = note.x - playhead_x
-			-- t = (note.x - playhead_x) / (quant_length - note.dx)
-			local t_collision = wrap_distance(playhead_x, note.x) / (quant_length * (playing and 1 or 0) - note.dx)
+			-- playhead_x + quant * playing * t = note.x + note.dx * t
+			-- quant * playing * t - note.dx * t = note.x - playhead_x
+			-- t * (quant * playing - note.dx) = note.x - playhead_x
+			-- t = (note.x - playhead_x) / (quant - note.dx)
+			local t_collision = wrap_distance(playhead_x, note.x) / (quant * (playing and 1 or 0) - note.dx)
 			if t_collision > 0 and t_collision <= 1 then
 				if erasing then
 					table.remove(notes, i)
@@ -379,7 +374,7 @@ function midi_event(data)
 		playing = false
 	elseif message.type == 'start' then
 		playhead_x = -1 / ppqn
-		play_ticks = play_quant
+		quant_accumulator = quant_ticks
 		playing = true
 	elseif message.type == 'continue' then
 		playing = true
@@ -410,6 +405,7 @@ function grid_key(x, y, z)
 		keys_held[id] = z == 1
 		if not grid_erasing and z == 1 then
 			-- TODO: record note ons/offs...
+			-- ...no, really
 			add_note(get_grid_note(x, y), 100)
 		end
 	end
@@ -451,15 +447,23 @@ function init()
 	end)
 end
 
--- TODO: bronchi, centipede legs
+local screen_width = 127 -- columns 1 and 128 will be identical; 127 unique columns of px
+local y_center = 32.5
 function redraw()
-	local scale = 127 / width -- columns 1 and 128 will be identical; 127 unique columns of px
+	local scale = screen_width / width
 	screen.clear()
 	screen.aa(0)
+	screen.blend_mode('add')
 	-- draw beats
 	screen.level(1)
 	for i = 0, width do
+		local level = 1
+		if i % 4 == 0 then
+			level = 2
+		end
 		screen.rect(i * scale, 0, 1, 1)
+		screen.rect(i * scale, 64, 1, -1)
+		screen.level(level)
 		screen.fill()
 	end
 	-- draw playhead
@@ -468,51 +472,34 @@ function redraw()
 	screen.line_width(1)
 	screen.level(1)
 	screen.stroke()
-	-- draw notes
 	screen.aa(1)
-	for i, note in ipairs(notes) do
-		-- TODO: draw to indicate lengths
-		local x = note.x * scale + 0.5
-		local y = 64 - note.midi_note / 2
-		local r = note.anchor and 1.4 or 1
-		-- draw link to home
-		local home_distance = wrap_distance(note.x, note.home) * scale
-		screen.move(x + home_distance, 64)
-		screen.line(x, y)
-		screen.level(2)
-		screen.stroke()
-		-- wrap across left or right edge if needed
-		if x + home_distance < 0 then
-			screen.move(x + home_distance + 127, 64)
-			screen.line(x + 127, y)
+	-- draw notes
+	screen.move(-127, y_center) -- TODO: ?
+	for offset = -screen_width, screen_width, screen_width do
+		for i, note in ipairs(notes) do
+			local home_x = (note.home * scale) % screen_width + 0.5 + offset
+			local x = home_x + wrap_distance(note.home, note.x) * scale
+			-- TODO: only draw this note if we can see it or it's adjacent to one we can see
+			local home_y = y_center - (note.midi_note - root_midi_note) / (2 + math.abs(wrap_distance(note.home, note.x)) * scale / 3)
+			local y = y_center - (note.midi_note - root_midi_note) / 2
+			local offset = 0
+			screen.line(home_x, home_y)
 			screen.level(2)
 			screen.stroke()
-		elseif x + home_distance > 127 then
-			screen.move(x + home_distance - 127, 64)
-			screen.line(x - 127, y)
-			screen.level(2)
+			screen.move(home_x, home_y)
+			screen.line(x, y)
+			screen.level(2 + math.floor(2 * note.l))
 			screen.stroke()
+			-- draw note itself
+			screen.circle(x, y, 1.2 + 0.5 * note.l)
+			screen.level(2 + math.floor(13 * note.l))
+			screen.fill()
+			screen.move(home_x, home_y)
 		end
-		-- TODO: wrap: if a line from x to home or home to x would cross 0
-		-- draw note itself
-		screen.circle(x, y, r)
-		if note.anchor then
-			screen.circle(x, 64, 1)
-		end
-		if x <= 0 then
-			screen.circle(x + 127, y, r)
-			if note.anchor then
-				screen.circle(x + 127, 64, 1)
-			end
-		elseif x > 127 then
-			screen.circle(x - 127, y, r)
-			if note.anchor then
-				screen.circle(x - 127, 64, 1)
-			end
-		end
-		screen.level(3 + math.floor(12 * note.l))
-		screen.fill()
 	end
+	screen.line(255, y_center)
+	screen.level(2)
+	screen.stroke()
 	screen.update()
 end
 
@@ -542,7 +529,6 @@ end
 
 function key(n, z)
 	if n == 1 then
-		anchoring = z == 1
 	elseif n == 2 then
 		erasing = z == 1
 	elseif n == 3 then
