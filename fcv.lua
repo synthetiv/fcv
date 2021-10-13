@@ -188,7 +188,6 @@ function play_node(node)
 	local pitch_class = pitch % 12
 	local cents = ji_cents[pitch_class + 1] + 1200 * octave
 	esq_cents(cents, 100, 1/2)
-	node.l = 1
 end
 
 function add_node(midi_note, velocity)
@@ -201,7 +200,7 @@ function add_node(midi_note, velocity)
 		dx = 0,
 		midi_note = midi_note,
 		velocity = velocity,
-		hz = musicutil.note_num_to_freq(midi_note),
+		play = play_node
 		l = 0
 	}
 	if recording then
@@ -211,7 +210,8 @@ function add_node(midi_note, velocity)
 		local slot = non_recorded_nodes:get()
 		slot.node = node
 	end
-	play_node(node)
+	node:play()
+	node.l = 1
 end
 
 function double_width()
@@ -226,7 +226,7 @@ function double_width()
 			midi_note = node.midi_note,
 			velocity = node.velocity,
 			l = 0,
-			hz = node.hz -- TODO: no hz
+			play = node.play
 		}
 	end
 	width = width * 2
@@ -353,7 +353,8 @@ function tick()
 						end
 					end
 					if not did_erase then
-						play_node(node)
+						node:play()
+						node.l = 1
 					end
 				end
 			end
