@@ -1,7 +1,7 @@
 -- tremple ov psychick youth
 
-engine.name = 'Thebangs'
-thebangs = include 'thebangs/lib/thebangs_engine'
+engine.name = 'Lately'
+lately = include 'lately/lib/lately_engine'
 
 musicutil = require 'musicutil'
 Voice = require 'voice'
@@ -182,12 +182,23 @@ function esq_cents(cents, velocity, length)
 	end
 end
 
-function play_node(node)
-	local pitch = node.midi_note - root_midi_note
+function get_pitch_class_and_octave(midi_note)
+	local pitch = midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
 	local pitch_class = pitch % 12
-	local cents = ji_cents[pitch_class + 1] + 1200 * octave
-	esq_cents(cents, 100, 1/2)
+	return pitch_class, octave
+end
+
+function play_node(node)
+	local pitch_class, octave = get_pitch_class_and_octave(node.midi_note)
+	-- local cents = ji_cents[pitch_class + 1] + 1200 * octave
+	-- esq_cents(cents, 100, 1/2)
+	local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
+	engine.note_on(hz, 0.7)
+	clock.run(function()
+		clock.sleep(1/2)
+		engine.note_off()
+	end)
 end
 
 function add_node(midi_note, velocity)
@@ -200,7 +211,7 @@ function add_node(midi_note, velocity)
 		dx = 0,
 		midi_note = midi_note,
 		velocity = velocity,
-		play = play_node
+		play = play_node,
 		l = 0
 	}
 	if recording then
@@ -261,7 +272,6 @@ function tick()
 	if current_phase > math.pi then
 		current_phase = current_phase - math.pi
 	end
-	engine.mod1(math.cos(current_phase) * 0.05 + 0.07)
 	-- move nodes
 	for i, node in ipairs(nodes) do
 		node.x = node.x + node.dx
@@ -424,15 +434,8 @@ function init()
 	g = grid.connect()
 	g.key = grid_key
 
-	thebangs.add_additional_synth_params()
-	params:add_separator()
-	thebangs.add_voicer_params()
-
-	params:set('algo', 4)
-	engine.release(2.4)
-	engine.mod1(0.1)
-	engine.mod2(3)
-	engine.cutoff(12000)
+	lately.add_params()
+	params:bang()
 
 	play_clock = clock.run(function()
 		while true do
