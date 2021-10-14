@@ -176,6 +176,7 @@ function esq_cents(cents, velocity, length)
 	clock.run(function()
 		clock.sleep(length)
 		m:note_off(note_out, 0, channel)
+		esq_voice:release()
 	end)
 	esq_voice.on_steal = function()
 		m:note_off(note_out, 0, channel)
@@ -189,15 +190,33 @@ function get_pitch_class_and_octave(midi_note)
 	return pitch_class, octave
 end
 
-function play_node(node)
-	local pitch_class, octave = get_pitch_class_and_octave(node.midi_note)
-	-- local cents = ji_cents[pitch_class + 1] + 1200 * octave
-	-- esq_cents(cents, 100, 1/2)
+function lately_note(midi_note)
+	local pitch_class, octave = get_pitch_class_and_octave(midi_note)
 	local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
 	engine.note_on(hz, 0.7)
 	clock.run(function()
-		clock.sleep(1/2)
+		clock.sleep(1/8)
 		engine.note_off()
+	end)
+end
+
+function esq_note(midi_note)
+	local pitch_class, octave = get_pitch_class_and_octave(midi_note)
+	local cents = ji_cents[pitch_class + 1] + 1200 * octave
+	esq_cents(cents, 100, 1/2)
+end
+
+function play_esq(node)
+	esq_note(node.midi_note)
+end
+
+function play_node(node)
+	clock.run(function()
+		local rate = math.pow(2, math.random(3))
+		for n = 1, math.random(4) do
+			lately_note(node.midi_note)
+			clock.sleep(clock.get_beat_sec()/rate)
+		end
 	end)
 end
 
@@ -211,7 +230,7 @@ function add_node(midi_note, velocity)
 		dx = 0,
 		midi_note = midi_note,
 		velocity = velocity,
-		play = play_node,
+		play = play_esq,
 		l = 0
 	}
 	if recording then
