@@ -513,8 +513,8 @@ function redraw()
 			local home_x = (node.home * scale) % screen_width + 0.5 + offset
 			local x = home_x + wrap_distance(node.home, node.x) * scale
 			-- TODO: only draw this node if we can see it or it's adjacent to one we can see
-			local home_y = y_center - (node.midi_note - root_midi_note) / (3 + math.abs(wrap_distance(node.home, node.x)) * scale / 5)
-			local y = y_center - (node.midi_note - root_midi_note) / 2
+			local home_y = y_center - (node.midi_note - root_midi_note) / (2 + math.abs(wrap_distance(node.home, node.x)) * scale / 5)
+			local y = y_center - (node.midi_note - root_midi_note)
 			local offset = 0
 			screen.line(home_x, home_y)
 			screen.level(2)
