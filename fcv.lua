@@ -245,11 +245,14 @@ function add_node(midi_note, velocity)
 end
 
 function double_width()
-	-- TODO: fix the thing where a node sometimes gets wrapped or something
 	local n_nodes = #nodes
 	for i = 1, n_nodes do
 		local node = nodes[i]
-		nodes[i + n_nodes] = {
+		-- reduce all distances -- if home is near 0 and x is "before" home, x may be near width --
+		-- and when width is doubled, node will be pulled all the way across the screen and may tangle
+		-- with other nodes
+		node.x = node.home + wrap_distance(node.home, node.x)
+		local new_node = {
 			x = node.x + width,
 			home = node.home + width,
 			dx = node.dx,
@@ -258,6 +261,9 @@ function double_width()
 			l = 0,
 			play = node.play
 		}
+		node.x = node.x % (width * 2)
+		new_node.x = new_node.x % (width * 2)
+		nodes[i + n_nodes] = new_node
 	end
 	width = width * 2
 end
