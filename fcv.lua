@@ -6,17 +6,14 @@ lately = include 'lately/lib/lately_engine'
 musicutil = require 'musicutil'
 Voice = require 'voice'
 
+width = 8
+ppqn = 24
+
+play_ticks = 0
 playhead_x = 0
 play_clock = nil
 draw_clock = nil
-
-ppqn = 24
-
-quant_ticks = 1
-quant_accumulator = 0
-play_x = 0
-
-width = 4
+quant = 1
 
 d_bound = 0.5
 friction = 0
@@ -282,10 +279,9 @@ function halve_width()
 		end
 	end
 	-- wrap play head position if needed
-	if playhead_x >= half_width then
-		playhead_x = playhead_x - half_width
-	end
 	width = width / 2
+	play_ticks = play_ticks % (width * ppqn)
+	playhead_x = playhead_x % width
 	nodes = new_nodes
 end
 
@@ -306,13 +302,9 @@ function tick()
 		node.l = node.l * l_decay
 	end
 	-- move playhead
-	local quant = quant_ticks / ppqn
 	if playing then
-		playhead_x = playhead_x + 1 / ppqn
-		if playhead_x >= width then
-			playhead_x = playhead_x - width
-		end
-		quant_accumulator = (quant_accumulator + 1) % quant_ticks
+		play_ticks = (play_ticks + 1) % (width * ppqn)
+		playhead_x = play_ticks / ppqn
 	end
 	-- update motion
 	for i, node in ipairs(nodes) do
@@ -348,21 +340,21 @@ function tick()
 			node.dx = dx_max * sign(node.dx)
 		end
 	end
-	if playing and quant_accumulator == 0 then
-		-- TODO: fix missed nodes when quant > 1
+	if playing and play_ticks % quant == 0 then
+		local d_quant = quant / ppqn
 		-- detect node-playhead collisions
 		-- count down instead of up because we may end up removing elements from 'nodes', which will
 		-- affect elements at indices > i
 		for i = #nodes, 1, -1 do
 			local node = nodes[i]
 			-- find intersection of two lines...
-			-- playhead line: x = playhead_x + quant * playing * t
+			-- playhead line: x = playhead_x + playing * t
 			-- node line: x = node.x + node.dx * t
-			-- playhead_x + quant * playing * t = node.x + node.dx * t
-			-- quant * playing * t - node.dx * t = node.x - playhead_x
-			-- t * (quant * playing - node.dx) = node.x - playhead_x
-			-- t = (node.x - playhead_x) / (quant - node.dx)
-			local t_collision = wrap_distance(playhead_x, node.x) / (quant * (playing and 1 or 0) - node.dx)
+			-- playhead_x + d_quant * playing * t = node.x + node.dx * t
+			-- d_quant * playing * t - node.dx * t = node.x - playhead_x
+			-- t * (d_quant * playing - node.dx) = node.x - playhead_x
+			-- t = (node.x - playhead_x) / (d_quant * playing - node.dx)
+			local t_collision = wrap_distance(playhead_x, node.x) / (d_quant * (playing and 1 or 0) - node.dx)
 			if t_collision > 0 and t_collision <= 1 then
 				if erasing then
 					table.remove(nodes, i)
@@ -403,8 +395,8 @@ function midi_event(data)
 	elseif message.type == 'stop' then
 		playing = false
 	elseif message.type == 'start' then
+		play_ticks = -1
 		playhead_x = -1 / ppqn
-		quant_accumulator = quant_ticks
 		playing = true
 	elseif message.type == 'continue' then
 		playing = true
