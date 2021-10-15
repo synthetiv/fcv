@@ -44,7 +44,7 @@ m = nil
 g = nil
 
 nodes = {}
-non_recorded_nodes = Voice.new(16)
+live_notes = Voice.new(16)
 erasing = false
 
 function sort_nodes()
@@ -82,6 +82,11 @@ function shift(d)
 		node.x = node.x + d
 		node.home = node.home + d
 	end)
+end
+
+function net(message)
+	print(message)
+	print(debug.traceback())
 end
 
 function wrap_distance(a, b)
@@ -189,52 +194,63 @@ function lately_note(midi_note)
 	end)
 end
 
-function esq_note(midi_note)
+function esq_note(midi_note, velocity)
+	velocity = velocity or 100
 	local pitch_class, octave = get_pitch_class_and_octave(midi_note)
 	local cents = ji_cents[pitch_class + 1] + 1200 * octave
-	esq_cents(cents, 100, 1/2)
+	esq_cents(cents, velocity, 1/2)
 end
 
+local old_esq = play_esq
 function play_esq(node)
-	local octave = math.random(2) - 1
-	esq_note(node.midi_note + 12 * octave)
-end
--- do_all(function(n) n.play = play_esq end)
-
-function play_lately(node)
-	print(get_pitch_class_and_octave(node.midi_note))
+	print(string.rep(' ', node.midi_note - 28) .. '>>')
+	esq_note(node.midi_note)
 	clock.run(function()
-		local rate = math.pow(2, math.random(3))
-		-- for n = 1, math.random(4) do
-			lately_note(node.midi_note)
-			-- clock.sleep(clock.get_beat_sec()/rate)
-		-- end
+		clock.sleep(clock.get_beat_sec() * 2)
+		esq_note(node.midi_note - 12)
+		clock.sleep(clock.get_beat_sec() * 2)
+		esq_note(node.midi_note - 12)
 	end)
 end
--- do_all(function(n) n.play = play_lately end)
+do_where(function(n) return n.play == old_esq end, function(n) n.play = play_esq end)
 
-function add_node(midi_note, velocity)
+local old_lately = play_lately
+function play_lately(node)
+	clock.run(function()
+		local rate = math.pow(2, math.random(3))
+		for n = 1, math.random(4) do
+			local note = node.midi_note + 12 * (math.random(2) - 1)
+			lately_note(note)
+			-- print(string.rep(' ', note - 40) .. '[' .. words[math.random(#words)] .. ']')
+			clock.sleep(clock.get_beat_sec()/rate)
+		end
+	end)
+end
+do_where(function(n) return n.play == old_lately end, function(n) n.play = play_lately end)
+
+function add_node(midi_note, play_function)
+	play_function = play_function or play_lately
 	midi_note = midi_note or 60
-	velocity = velocity or 100
 	local node = {
 		x = playhead_x,
 		home = playhead_x,
 		y = y or 32,
 		dx = 0,
 		midi_note = midi_note,
-		velocity = velocity,
-		play = play_esq,
+		play = play_function,
 		l = 0
 	}
 	if recording then
 		table.insert(nodes, node)
 		sort_nodes()
 	else
-		local slot = non_recorded_nodes:get()
+		local slot = live_notes:get()
 		slot.node = node
 	end
-	node:play()
-	node.l = 1
+	xpcall(function()
+		node:play()
+		node.l = 1
+	end, net)
 	screen.ping()
 end
 
@@ -251,7 +267,6 @@ function double_width()
 			home = node.home + width,
 			dx = node.dx,
 			midi_note = node.midi_note,
-			velocity = node.velocity,
 			l = 0,
 			play = node.play
 		}
@@ -372,8 +387,10 @@ function tick()
 						end
 					end
 					if not did_erase then
-						node:play()
-						node.l = 1
+						xpcall(function()
+							node:play()
+							node.l = 1
+						end, net)
 						screen.ping()
 					end
 				end
@@ -381,7 +398,7 @@ function tick()
 		end
 	end
 	-- decay non-recorded nodes
-	for i, slot in ipairs(non_recorded_nodes.style.slots) do
+	for i, slot in ipairs(live_notes.style.slots) do
 		if slot.node ~= nil then
 			slot.node.l = slot.node.l * l_decay
 		end
@@ -390,9 +407,7 @@ end
 
 function midi_event(data)
 	local message = midi.to_msg(data)
-	if message.type == 'note_on' then
-		add_node(message.note, message.vel)
-	elseif message.type == 'stop' then
+	if message.type == 'stop' then
 		playing = false
 	elseif message.type == 'start' then
 		play_ticks = -1
@@ -426,7 +441,7 @@ function grid_key(x, y, z)
 		local id = x + (y - 1) * g.cols
 		keys_held[id] = z == 1
 		if not grid_erasing and z == 1 then
-			add_node(get_grid_note(x, y), 100)
+			add_node(get_grid_note(x, y))
 		end
 	end
 end
@@ -525,7 +540,7 @@ function grid_redraw()
 	for i, node in ipairs(nodes) do
 		note_levels[node.midi_note] = (note_levels[node.midi_note] or 2) + 15 * node.l
 	end
-	for i, slot in ipairs(non_recorded_nodes.style.slots) do
+	for i, slot in ipairs(live_notes.style.slots) do
 		if slot.node ~= nil then
 			note_levels[slot.node.midi_note] = (note_levels[slot.node.midi_note] or 0) + 15 * slot.node.l
 		end
@@ -546,9 +561,5 @@ function key(n, z)
 		k1_held = z == 1
 	elseif n == 2 then
 		erasing = z == 1
-	elseif n == 3 then
-		if z == 1 then
-			add_node()
-		end
 	end
 end
