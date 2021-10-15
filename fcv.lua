@@ -333,14 +333,9 @@ function tick()
 					-- attract
 					ddx = ddx - sign(d) * math.max(0, 2 * node_bound - math.abs(d))
 				end
-				-- TODO: handle note lengths too... a few options:
-				-- 1. ignore
-				-- 2. increase d_bound from centers of nodes <-- this seems like the most interesting option
-				-- 3. get distances between starts + ends of notes and choose the smallest
 			end
 		end
 		-- 'inertia' reduces the influence of attraction/repulsion forces
-		-- TODO: note that if mass < 0, ddx will be multiplied... which may account for some of the craziness you've observed
 		ddx = ddx / mass / inertia
 		-- 'damping' reduces speed over time, damping oscillation
 		-- when damping is 1, nodes will find a comfortable spot and stay there, tending to cluster
@@ -404,7 +399,6 @@ end
 function midi_event(data)
 	local message = midi.to_msg(data)
 	if message.type == 'note_on' then
-		-- TODO: store note lengths
 		add_node(message.note, message.vel)
 	elseif message.type == 'stop' then
 		playing = false
@@ -440,8 +434,6 @@ function grid_key(x, y, z)
 		local id = x + (y - 1) * g.cols
 		keys_held[id] = z == 1
 		if not grid_erasing and z == 1 then
-			-- TODO: record note ons/offs...
-			-- ...no, really
 			add_node(get_grid_note(x, y), 100)
 		end
 	end
@@ -505,12 +497,11 @@ function redraw()
 	end
 	screen.aa(1)
 	-- draw nodes
-	screen.move(-127, y_center) -- TODO: ?
+	screen.move(-127, y_center)
 	for offset = -screen_width, screen_width, screen_width do
 		for i, node in ipairs(nodes) do
 			local home_x = (node.home * scale) % screen_width + 0.5 + offset
 			local x = home_x + wrap_distance(node.home, node.x) * scale
-			-- TODO: only draw this node if we can see it or it's adjacent to one we can see
 			local home_y = y_center - (node.midi_note - root_midi_note) / (2 + math.abs(wrap_distance(node.home, node.x)) * scale / 5)
 			local y = y_center - (node.midi_note - root_midi_note)
 			local offset = 0
