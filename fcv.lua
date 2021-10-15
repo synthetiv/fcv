@@ -1,4 +1,4 @@
--- tremple ov psychick youth
+-- flash crash V
 
 engine.name = 'Lately'
 lately = include 'lately/lib/lately_engine'
@@ -16,10 +16,38 @@ quant_ticks = 1
 quant_accumulator = 0
 play_x = 0
 
+width = 4
+
+d_bound = 0.5
+friction = 0
+damping = 0.005
+inertia = 1000
+mass = 0.8
+dx_max = width / 2
+homing = 0.8
+
+current_phase = 0
+current_increment = math.pi / ppqn / 7
+current_force = 0.05
+
+l_decay = 0.9
+
+grid_octave = 2
+
+playing = false
+recording = false
+
+grid_erasing = false
+keys_held = {}
+n_keys = 128
+
+k1_held = false
+
 m = nil
 g = nil
 
 nodes = {}
+non_recorded_nodes = Voice.new(16)
 erasing = false
 
 function sort_nodes()
@@ -27,30 +55,6 @@ function sort_nodes()
 		return a.home < b.home
 	end)
 end
--- a sufficiently successful sequence:
--- current x, home, midi note
--- .67672059549374 .58333333333327 63 = 14 =  2 =  8/7
--- 1.3312846516363 1.333333333333  72 = 23 = 11 = 16/9
--- 1.4866981696884 1.4166666666666 58 = 9  =  9 =  8/5
--- 1.7618660074246 1.7499999999999 69 = 20 =  8 = 32/21
--- 2.132197774293  2.1666666666666 64 = 15 =  3 =  7/6
--- 2.4836666000621 2.4999999999999 61 = 12 =  0 =  1/1
--- 2.8540553411407 3.0833333333333 50 = 1  =  1 = 64/63
--- 2.939992118522  2.7916666666666 62 = 13 =  1 = 64/63
--- 3.3271179416657 3.4583333333333 62 = 13 =  1 = 64/63
--- 3.6888339679937 3.7916666666666 49 = 0  =  0 =  1/1
--- 4.5219987041017 4.5833333333333 63 = 14 =  2 =  8/7
--- 5.2290980524288 5.333333333333  72 = 23 = 11 = 16/9
--- 5.4086146572805 5.4166666666666 58 = 9  =  9 =  8/5
--- 5.7023812998105 5.7499999999999 69 = 20 =  8 = 32/21
--- 6.1343900537404 6.1666666666666 64 = 15 =  3 =  7/6
--- 6.4943222992263 6.583333333333  53 = 4  =  4 =  6/5
--- 6.6226535705355 6.4999999999999 61 = 12 =  0 =  1/1
--- 6.930494659312  7.0833333333333 50 = 1  =  1 = 64/63
--- 7.0169963005057 6.7916666666666 62 = 13 =  1 = 64/63
--- 7.4153014639616 7.4583333333333 62 = 13 =  1 = 64/63
--- 7.7227328302841 7.6666666666662 57 = 8  =  8 = 32/21
--- 7.9339618998232 7.7916666666666 49 = 0  =  0 =  1/1
 
 function nodes_where(p)
 	local selection = {}
@@ -83,38 +87,6 @@ function shift(d)
 	end)
 end
 
-width = 4
-
--- TODO: OT capture
-
--- TODO: make these overridable on a per-node basis
-d_bound = 0.5
-friction = 0
-damping = 0.005
-inertia = 1000
-mass = 0.8
-dx_max = width / 2
-homing = 0.8
-
-current_phase = 0
-current_increment = math.pi / ppqn / 7
-current_force = 0.05
-
-l_decay = 0.9
-
-grid_octave = 2
-
-playing = false
-recording = false
-
-grid_erasing = false
-keys_held = {}
-n_keys = 128
-
-k1_held = false
-
-non_recorded_nodes = Voice.new(16)
-
 function wrap_distance(a, b)
 	local d = b - a
 	while d > width / 2 do
@@ -144,22 +116,42 @@ end
 
 ji_ratios = {
 	1,
-	64/63, -- 1 / 7 / 3 / 3
-	8/7, -- 1 / 7
-	7/6, -- 7 / 3
-	6/5, -- 3 / 5
-	4/3, -- 1 / 3
-	7/5, --
-	3/2, -- 3 / 1
-	32/21, -- 1 / 7 / 3
-	8/5, -- 1 / 5
-	7/4, -- 7 / 1
-	16/9 -- 1 / 3 / 3
+	64/63, --  /7/3/3
+	8/7,   --  /7
+	7/6,   -- 7/3
+	6/5,   -- 3/5
+	4/3,   --  /3
+	7/5,   --
+	3/2,   -- 3
+	32/21, --  /7/3
+	8/5,   --  /5
+	7/4,   -- 7
+	16/9   --  /3/3
 }
 calculate_cents()
-
-root_midi_note = 49 -- just happens to be the root note of the sequence that's currently playing
+root_midi_note = 49
 root_freq = musicutil.note_num_to_freq(root_midi_note)
+
+-- alt tuning:
+--[[
+ji_ratios = {
+	1,
+	49/48,   -- 7*7/3
+	21/20,   -- 7*3/5
+	147/128, -- 7*7*3
+	7/6,     -- 7/3
+	4/3,     --  /3
+	7/5,     --
+	3/2,     -- 3
+	49/32,   -- 7*7
+	14/9,    -- 7/3/3
+	7/4,     -- 7
+	16/9,    --  /3/3
+}
+calculate_cents()
+root_midi_note = 51
+root_freq = musicutil.note_num_to_freq(49) * 8/7
+--]]
 
 esq_voices = Voice.new(8)
 
@@ -168,7 +160,6 @@ function esq_cents(cents, velocity, length)
 	-- max MIDI bend = 16383; center = 8191
 	local bend_frac = ((cents % 100) / 100)
 	local bend_out = math.floor(8191.5 * (1 + bend_frac))
-	-- TODO: voice enable/disable
 	local esq_voice = esq_voices:get()
 	local channel = esq_voice.id + 8
 	m:pitchbend(bend_out, channel)
@@ -192,8 +183,9 @@ end
 
 function lately_note(midi_note)
 	local pitch_class, octave = get_pitch_class_and_octave(midi_note)
-	local hz = root_freq * ji_ratios[pitch_class + 1] * math.pow(2, octave)
-	engine.note_on(hz, 0.7)
+	local ratio = ji_ratios[pitch_class + 1] * math.pow(2, octave)
+	local hz = root_freq * ratio
+	engine.note_on(hz, math.pow(0.6, ratio))
 	clock.run(function()
 		clock.sleep(1/8)
 		engine.note_off()
@@ -207,18 +199,22 @@ function esq_note(midi_note)
 end
 
 function play_esq(node)
-	esq_note(node.midi_note)
+	local octave = math.random(2) - 1
+	esq_note(node.midi_note + 12 * octave)
 end
+-- do_all(function(n) n.play = play_esq end)
 
-function play_node(node)
+function play_lately(node)
+	print(get_pitch_class_and_octave(node.midi_note))
 	clock.run(function()
 		local rate = math.pow(2, math.random(3))
-		for n = 1, math.random(4) do
+		-- for n = 1, math.random(4) do
 			lately_note(node.midi_note)
-			clock.sleep(clock.get_beat_sec()/rate)
-		end
+			-- clock.sleep(clock.get_beat_sec()/rate)
+		-- end
 	end)
 end
+-- do_all(function(n) n.play = play_lately end)
 
 function add_node(midi_note, velocity)
 	midi_note = midi_note or 60
@@ -242,6 +238,7 @@ function add_node(midi_note, velocity)
 	end
 	node:play()
 	node.l = 1
+	screen.ping()
 end
 
 function double_width()
@@ -390,6 +387,7 @@ function tick()
 					if not did_erase then
 						node:play()
 						node.l = 1
+						screen.ping()
 					end
 				end
 			end
@@ -524,7 +522,7 @@ function redraw()
 			screen.level(2 + math.floor(2 * node.l))
 			screen.stroke()
 			-- draw node itself
-			screen.circle(x, y, 1.2 + 0.5 * node.l)
+			screen.circle(x, y, 1.2 + 1.2 * node.l)
 			screen.level(2 + math.floor(13 * node.l))
 			screen.fill()
 			screen.move(home_x, home_y)
