@@ -527,7 +527,7 @@ function redraw()
 			screen.level(2 + math.floor(2 * node.l))
 			screen.stroke()
 			-- draw node itself
-			screen.circle(x, y, 1.2 + 1.2 * node.l)
+			screen.circle(x, y, 1.2 + 3 * node.l)
 			screen.level(2 + math.floor(13 * node.l))
 			screen.fill()
 			screen.move(home_x, home_y)
