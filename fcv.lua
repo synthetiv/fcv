@@ -47,34 +47,41 @@ nodes = {}
 live_notes = Voice.new(16)
 erasing = false
 
+function yes()
+	return true
+end
+
 function sort_nodes()
 	table.sort(nodes, function(a, b)
 		return a.home < b.home
 	end)
 end
 
-function nodes_where(p)
-	local selection = {}
-	for i, node in ipairs(nodes) do
+function do_where(p, a)
+	for i = #nodes, 1, -1 do
+		local node = nodes[i]
 		if p(node) then
-			table.insert(selection, node)
+			a(node, i)
+			-- clean up, if needed (like if we just added an offset to all nodes)
+			node.x = node.x % width
+			node.home = node.home % width
 		end
 	end
-	return selection
-end
-
-function do_where(p, a)
-	local selection = nodes_where(p)
-	for i, node in ipairs(selection) do
-		a(node)
-		-- clean up, if needed (like if we just added a random offset to all nodes)
-		node.x = node.x % width
-		node.home = node.home % width
-	end
+	sort_nodes()
 end
 
 function do_all(a)
-	do_where(function() return true end, a)
+	do_where(yes, a)
+end
+
+function delete_where(p)
+	do_where(p, function(node, i)
+		table.remove(nodes, i)
+	end)
+end
+
+function delete_all()
+	delete_where(yes)
 end
 
 function shift(d)
