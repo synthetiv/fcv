@@ -23,9 +23,9 @@ mass = 0.8
 dx_max = width / 2
 homing = 0.8
 
-current_phase = 0
-current_increment = math.pi / ppqn / 7
-current_force = 0.05
+sway_phase = 0
+sway_increment = math.pi / ppqn / 7
+sway_force = 0.05
 
 l_decay = 0.9
 
@@ -187,6 +187,7 @@ function get_pitch_class_and_octave(midi_note)
 	local pitch = midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
 	local pitch_class = pitch % 12
+	-- print(pitch_class, octave)
 	return pitch_class, octave
 end
 
@@ -196,7 +197,7 @@ function lately_note(midi_note)
 	local hz = root_freq * ratio
 	engine.note_on(hz, math.pow(0.6, ratio))
 	clock.run(function()
-		clock.sleep(1/8)
+		clock.sleep(clock.get_beat_sec() / 8)
 		engine.note_off()
 	end)
 end
@@ -223,20 +224,30 @@ do_where(function(n) return n.play == old_esq end, function(n) n.play = play_esq
 
 local old_lately = play_lately
 function play_lately(node)
-	clock.run(function()
-		local rate = math.pow(2, math.random(3))
-		for n = 1, math.random(4) do
-			local note = node.midi_note + 12 * (math.random(2) - 1)
+	--clock.run(function()
+		--local rate = math.pow(2, math.random(3))
+		--for n = 1, math.random(4) do
+			local note = node.midi_note -- + 12 * (math.random(2) - 1)
 			lately_note(note)
+			print(string.rep(' ', note - 40) .. '[]')
 			-- print(string.rep(' ', note - 40) .. '[' .. words[math.random(#words)] .. ']')
-			clock.sleep(clock.get_beat_sec()/rate)
-		end
-	end)
+			--clock.sleep(clock.get_beat_sec()/rate)
+		--end
+	--end)
 end
 do_where(function(n) return n.play == old_lately end, function(n) n.play = play_lately end)
 
-function add_node(midi_note, play_function)
-	play_function = play_function or play_lately
+function play_ot(ch)
+	return function(node)
+		m:note_on(node.midi_note, 100, ch)
+		clock.run(function()
+			clock.sleep(clock.get_beat_sec() / 16)
+			m:note_off(node.midi_note, 0, 6)
+		end)
+	end
+end
+
+function add_node(midi_note)
 	midi_note = midi_note or 60
 	local node = {
 		x = playhead_x,
@@ -244,7 +255,7 @@ function add_node(midi_note, play_function)
 		y = y or 32,
 		dx = 0,
 		midi_note = midi_note,
-		play = play_function,
+		play = play_ot(4),
 		l = 0
 	}
 	if recording then
@@ -265,9 +276,9 @@ function double_width()
 	local n_nodes = #nodes
 	for i = 1, n_nodes do
 		local node = nodes[i]
-		-- reduce all distances -- if home is near 0 and x is "before" home, x may be near width --
-		-- and when width is doubled, node will be pulled all the way across the screen and may tangle
-		-- with other nodes
+		-- reduce all distances -- if home is near 0 and x is "before" home, x
+		-- may be near width -- and when width is doubled, node will be pulled
+		-- all the way across the screen and may tangle with other nodes
 		node.x = node.home + wrap_distance(node.home, node.x)
 		local new_node = {
 			x = node.x + width,
@@ -308,9 +319,9 @@ function halve_width()
 end
 
 function tick()
-	current_phase = current_phase + current_increment
-	if current_phase > math.pi then
-		current_phase = current_phase - math.pi
+	sway_phase = sway_phase + sway_increment
+	if sway_phase > math.pi then
+		sway_phase = sway_phase - math.pi
 	end
 	-- move nodes
 	for i, node in ipairs(nodes) do
@@ -332,13 +343,14 @@ function tick()
 	for i, node in ipairs(nodes) do
 		-- tend homeward
 		local ddx = homing * wrap_distance(node.x, node.home)
-		-- apply current
-		ddx = ddx + math.sin(current_phase + node.x / width * 2 * math.pi) * current_force
+		-- apply sway
+		ddx = ddx + math.sin(sway_phase + node.x / width * 2 * math.pi) * sway_force
 		for j, other in ipairs(nodes) do
 			if node ~= other then
 				local d = wrap_distance(node.x, other.x)
 				local abs_d = math.abs(d)
-				-- 'd_bound' is the distance at which there is NO attraction or repulsion
+				-- 'd_bound' is the distance at which there is NO attraction or
+				-- repulsion
 				local node_bound = d_bound * mass
 				if abs_d < 1.5 * node_bound then
 					-- repel
@@ -352,10 +364,12 @@ function tick()
 		-- 'inertia' reduces the influence of attraction/repulsion forces
 		ddx = ddx / mass / inertia
 		-- 'damping' reduces speed over time, damping oscillation
-		-- when damping is 1, nodes will find a comfortable spot and stay there, tending to cluster
-		-- together, with tighter spacing in the center of the cluster; at 0, they'll move constantly
+		-- when damping is 1, nodes will find a comfortable spot and stay there,
+		-- tending to cluster together, with tighter spacing in the center of the
+		-- cluster; at 0, they'll move constantly
 		node.dx = ddx + node.dx * (1 - damping)
-		-- friction applies an opposing force, up to a limit defined by mass * friction constant
+		-- friction applies an opposing force, up to a limit defined by mass *
+		-- friction constant
 		node.dx = sign(node.dx) * math.max(0, math.abs(node.dx) - mass * friction)
 		-- finally, clamp overall speed
 		if math.abs(node.dx) > dx_max then
@@ -365,8 +379,8 @@ function tick()
 	if playing and play_ticks % quant == 0 then
 		local d_quant = quant / ppqn
 		-- detect node-playhead collisions
-		-- count down instead of up because we may end up removing elements from 'nodes', which will
-		-- affect elements at indices > i
+		-- count down instead of up because we may end up removing elements from
+		-- 'nodes', which will affect elements at indices > i
 		for i = #nodes, 1, -1 do
 			local node = nodes[i]
 			-- find intersection of two lines...
@@ -482,7 +496,8 @@ function init()
 	end)
 end
 
-local screen_width = 127 -- columns 1 and 128 will be identical; 127 unique columns of px
+-- columns 1 and 128 will be identical; 127 unique columns of px
+local screen_width = 127
 local y_center = 32.5
 function redraw()
 	local scale = screen_width / width
