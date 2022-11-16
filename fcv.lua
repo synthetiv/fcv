@@ -125,14 +125,14 @@ end
 
 ji_ratios = {
 	1,
-	64/63, --  /7/3/3
-	8/7,   --  /7
+	49/48, -- 7*7/3
+	21/20, -- 7*3/5
 	7/6,   -- 7/3
 	6/5,   -- 3/5
 	4/3,   --  /3
 	7/5,   --
 	3/2,   -- 3
-	32/21, --  /7/3
+	49/32, -- 7*7
 	8/5,   --  /5
 	7/4,   -- 7
 	16/9   --  /3/3
@@ -170,6 +170,9 @@ function esq_cents(cents, velocity, length)
 	local bend_frac = ((cents % 100) / 100)
 	local bend_out = math.floor(8191.5 * (1 + bend_frac))
 	local esq_voice = esq_voices:get()
+	-- if esq_voice.id == 5 then
+	-- 	note_out = note_out + 24
+	-- end
 	local channel = esq_voice.id + 8
 	m:pitchbend(bend_out, channel)
 	m:note_on(note_out, velocity, channel)
@@ -187,7 +190,7 @@ function get_pitch_class_and_octave(midi_note)
 	local pitch = midi_note - root_midi_note
 	local octave = math.floor(pitch / 12)
 	local pitch_class = pitch % 12
-	-- print(pitch_class, octave)
+	print(pitch_class, octave)
 	return pitch_class, octave
 end
 
@@ -211,35 +214,39 @@ end
 
 local old_esq = play_esq
 function play_esq(node)
-	print(string.rep(' ', node.midi_note - 28) .. '>>')
-	esq_note(node.midi_note)
 	clock.run(function()
-		clock.sleep(clock.get_beat_sec() * 2)
-		esq_note(node.midi_note - 12)
-		clock.sleep(clock.get_beat_sec() * 2)
-		esq_note(node.midi_note - 12)
+		print(string.rep(' ', node.midi_note - 28) .. '>>')
+		esq_note(node.midi_note) -- + (math.random(3) - 2) * 12)
+		-- clock.sleep(clock.get_beat_sec() * 2)
+		-- esq_note(node.midi_note - 12)
+		-- clock.sleep(clock.get_beat_sec() * 2)
+		-- esq_note(node.midi_note - 12)
 	end)
 end
 do_where(function(n) return n.play == old_esq end, function(n) n.play = play_esq end)
 
 local old_lately = play_lately
 function play_lately(node)
-	--clock.run(function()
-		--local rate = math.pow(2, math.random(3))
-		--for n = 1, math.random(4) do
-			local note = node.midi_note -- + 12 * (math.random(2) - 1)
-			lately_note(note)
-			print(string.rep(' ', note - 40) .. '[]')
-			-- print(string.rep(' ', note - 40) .. '[' .. words[math.random(#words)] .. ']')
-			--clock.sleep(clock.get_beat_sec()/rate)
-		--end
-	--end)
+	clock.run(function()
+		-- local rate = math.pow(2, math.random(4))
+		-- for n = 1, math.random(4) do
+		   	local note = node.midi_note + 12 * (math.random(2) - 1)
+		   	lately_note(note)
+		   	print(string.rep(' ', note - 40) .. '[]')
+		-- 	clock.sleep(clock.get_beat_sec()/rate)
+		-- end
+	end)
 end
 do_where(function(n) return n.play == old_lately end, function(n) n.play = play_lately end)
 
 function play_ot(ch)
+	-- offset for chromatic map mode
+	local offset = 0
+	if ch == 3 then
+		offset = 24
+	end
 	return function(node)
-		m:note_on(node.midi_note, 100, ch)
+		m:note_on(node.midi_note + offset, 100, ch)
 		clock.run(function()
 			clock.sleep(clock.get_beat_sec() / 16)
 			m:note_off(node.midi_note, 0, 6)
